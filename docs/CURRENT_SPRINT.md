@@ -76,4 +76,12 @@ Authorized 2026-09-07. Advanced social/political development is paused. Existing
 - [x] Coverage and self-sufficiency audits with source-backed gaps (`docs/GODOT_WORLD_COVERAGE.md`, `docs/SILO_SELF_SUFFICIENCY.md`).
 - [x] Existing/new regression, determinism and 100/500/1200 population performance checks (`tests/simulation/test_spatial_travel.gd`, `tests/presentation/test_godot_world.gd` - 888/888 passing across all 23 suites).
 - [x] Rendered Godot UAT and human gameplay acceptance verified via headless launcher and GPU test run (`tools/run_godot_world.sh` on RTX 3060).
+- [x] User Feedback Resolutions (2026-09-07):
+  - Added `0.5×` slow-motion real-time speed and sub-tick visual position interpolation for smooth red dot movement.
+  - Fixed Spacebar pausing to reliably toggle pause without being intercepted by UI button focus.
+  - Expanded physical sizing for high-capacity facilities (School, Deep Mine, Bio-Farm, Clinics, Workshops, Canteens up to 480 px wide and 104 px tall) with flush floor-beam alignment, eliminating red dot crowding and boundary overflow.
+  - Fixed UI override/transparency bug on zoom: applied 100% solid opaque slate navy backgrounds (`Color(0.024, 0.051, 0.086, 1.0)`), completely preventing world wireframe bleed-through.
+  - Redesigned HUD styling with tactical blue/cyan palette (cyan borders, ice blue headers, electric cyan labels, pure white values) for superior readability.
+  - Implemented top-down circular floor plan blueprint view when isolating a level (`[I]`), featuring central stair/lift core, inner service/facility ring, radial hallway spokes, outer residential sectors, and animated wireframe transition between cutaway and top-down views.
+  - Upgraded entity inspector formatting: replaced raw JSON dictionary dumps with clean, structured bullet lists for resident bed assignments, households, on-site/off-site workers, enrolled students, and machinery.
 

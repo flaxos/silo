@@ -7,12 +7,13 @@ const TravelModel = preload("res://src/sim/spatial/spatial_travel_model.gd")
 ## simulation. Coordinates are presentation-neutral authoritative metadata: this
 ## class never consumes WorldState randomness and never registers entities.
 
-const ROOM_HEIGHT: float = 72.0
-const LEVEL_GAP: float = 34.0
-const ROOM_GAP: float = 8.0
+const ROOM_HEIGHT: float = 88.0
+const LEVEL_GAP: float = 38.0
+const ROOM_GAP: float = 10.0
 const SECTOR_GAP: float = 36.0
-const MIN_ROOM_WIDTH: float = 92.0
-const MAX_ROOM_WIDTH: float = 230.0
+const MIN_ROOM_WIDTH: float = 110.0
+const MAX_ROOM_WIDTH: float = 480.0
+const MAX_EXTRA_HEIGHT: float = 16.0
 
 static func build(ws: WorldState) -> Dictionary:
 	var result: Dictionary = {"levels": [], "rooms": [], "portals": [], "corridors": [], "landings": [], "stair_segments": [], "connectors": [], "bounds": {}, "warnings": []}
@@ -36,6 +37,7 @@ static func build(ws: WorldState) -> Dictionary:
 	var max_x: float = 420.0
 	const STAIR_X: float = -34.0
 	const STAIR_WIDTH: float = 68.0
+	var level_stride: float = ROOM_HEIGHT + MAX_EXTRA_HEIGHT + LEVEL_GAP
 	for level_index in range(levels.size()):
 		var level: int = int(levels[level_index])
 		var level_rooms: Array = by_level[level]
@@ -43,9 +45,22 @@ static func build(ws: WorldState) -> Dictionary:
 			return a.sector_id < b.sector_id or (a.sector_id == b.sector_id and a.id < b.id))
 		var left_x: float = STAIR_X - 28.0
 		var right_x: float = STAIR_X + STAIR_WIDTH + 28.0
+		var level_y: float = float(level_index) * level_stride
+		var floor_y: float = level_y + ROOM_HEIGHT + MAX_EXTRA_HEIGHT
 		for room in level_rooms:
-			var width: float = clampf(MIN_ROOM_WIDTH + sqrt(float(maxi(1, room.capacity_people))) * 13.0, MIN_ROOM_WIDTH, MAX_ROOM_WIDTH)
-			var y: float = float(level_index) * (ROOM_HEIGHT + LEVEL_GAP)
+			var cap: int = maxi(1, room.capacity_people)
+			var width: float
+			var height: float = ROOM_HEIGHT
+			if room.room_type in [Room.TYPE_RESIDENTIAL_APARTMENT, Room.TYPE_DORMITORY]:
+				width = clampf(MIN_ROOM_WIDTH + sqrt(float(cap)) * 14.0, MIN_ROOM_WIDTH, 155.0)
+			else:
+				# Non-residential facilities (Deep Mine, School, Bio-Farm, Workshops, Clinics, Canteens)
+				# are significantly wider and taller to match their physical role and resident capacity.
+				width = clampf(160.0 + float(cap) * 5.2, 180.0, MAX_ROOM_WIDTH)
+				if cap >= 25:
+					height = ROOM_HEIGHT + MAX_EXTRA_HEIGHT
+
+			var y: float = floor_y - height
 			var x: float
 			# Sector IDs grow with population size, so parity keeps both sides of the
 			# central spine balanced without changing any authoritative domain IDs.
@@ -59,10 +74,10 @@ static func build(ws: WorldState) -> Dictionary:
 			result["rooms"].append({
 				"id": room.id, "level": room.level, "sector_id": room.sector_id,
 				"room_type": room.room_type, "x": x, "y": y,
-				"width": width, "height": ROOM_HEIGHT, "capacity": room.capacity_people
+				"width": width, "height": height, "capacity": room.capacity_people
 			})
 			var door_x: float = x + width * 0.5
-			var door_y: float = y + ROOM_HEIGHT
+			var door_y: float = floor_y
 			var spine_y: float = door_y + 8.0
 			result["portals"].append({
 				"id": "portal_%d" % room.id, "room_id": room.id,
@@ -78,9 +93,8 @@ static func build(ws: WorldState) -> Dictionary:
 			})
 		min_x = minf(min_x, left_x)
 		max_x = maxf(max_x, right_x)
-		var level_y: float = float(level_index) * (ROOM_HEIGHT + LEVEL_GAP)
-		result["levels"].append({"id": level, "index": level_index, "y": level_y, "room_count": level_rooms.size()})
-		result["landings"].append({"id": "landing_%d" % level, "level": level, "x": STAIR_X, "y": level_y, "width": STAIR_WIDTH, "height": ROOM_HEIGHT})
+		result["levels"].append({"id": level, "index": level_index, "y": level_y, "floor_y": floor_y, "room_count": level_rooms.size()})
+		result["landings"].append({"id": "landing_%d" % level, "level": level, "x": STAIR_X, "y": level_y, "width": STAIR_WIDTH, "height": ROOM_HEIGHT + MAX_EXTRA_HEIGHT})
 
 	var travel_state: Dictionary = ws.custom_data.get(TravelModel.STATE_KEY, {})
 	var live_segments: Dictionary = travel_state.get("segments", {})
@@ -90,7 +104,7 @@ static func build(ws: WorldState) -> Dictionary:
 		var segment: Dictionary = {
 			"id": segment_id, "kind": "central_stair", "from_level": levels[i], "to_level": levels[i + 1],
 			"from_landing_id": "landing_%d" % levels[i], "to_landing_id": "landing_%d" % levels[i + 1],
-			"x": STAIR_X, "y": float(i) * (ROOM_HEIGHT + LEVEL_GAP) + ROOM_HEIGHT,
+			"x": STAIR_X, "y": float(i) * level_stride + (ROOM_HEIGHT + MAX_EXTRA_HEIGHT),
 			"width": STAIR_WIDTH, "height": LEVEL_GAP,
 			"base_travel_ticks": int(live.get("base_travel_ticks", TravelModel.SEGMENT_TRAVEL_TICKS)),
 			"capacity": int(live.get("capacity", TravelModel.SEGMENT_CAPACITY)),
@@ -100,5 +114,5 @@ static func build(ws: WorldState) -> Dictionary:
 		}
 		result["stair_segments"].append(segment)
 		result["connectors"].append(segment.duplicate())
-	result["bounds"] = {"x": min_x, "y": 0.0, "width": max_x - min_x, "height": float(levels.size()) * (ROOM_HEIGHT + LEVEL_GAP)}
+	result["bounds"] = {"x": min_x, "y": 0.0, "width": max_x - min_x, "height": float(levels.size()) * level_stride}
 	return result

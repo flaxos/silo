@@ -436,4 +436,43 @@ To communicate the physical depth, scale, and claustrophobic gravity of the unde
 - Deterministic simulation integrity is strictly preserved: presentation remains a 100% read-only consumer of `WorldState` and `PhysicalReader`.
 - All 23 headless test suites (888 assertions) pass with zero regressions.
 
+---
+
+## ADR-018: Top-Down Circular Blueprint Mode, Expanded Facility Sizing & High-Contrast Tactical UI Console
+
+### Status
+Accepted
+
+### Context
+Following user playtesting and feedback on the 2.5D wireframe representation:
+1. High-capacity facilities (School with 40 students, Deep Mine with 60 miners, Bio-Farm, Clinics, Canteens) were sized identically to smaller rooms, resulting in resident red dots cramming and overflowing room boundaries.
+2. In level isolation mode (`[I]`), the view remained a 2D vertical cutaway rather than presenting the authentic architectural floor plan of a circular cylindrical silo.
+3. Zooming into the cutaway caused world wireframe geometry to bleed through the right-hand UI sidebar due to partial alpha blending.
+4. Raw JSON strings were dumped for household members and room occupants in the entity inspector.
+5. Spacebar keypresses failed to pause when UI buttons held focus.
+6. A real-time 0.5× speed was needed for smooth, continuous observation of resident transit.
+
+### Decision
+1. **Dynamic Architectural Sizing & Floor Alignment (`silo_spatial_model.gd`)**:
+   - Facility widths scale proportionally by capacity up to 480 px (e.g. Deep Mine 472 px, School 368 px, Bio-Farm 316 px).
+   - High-capacity facilities scale vertically to 104 px (from base 88 px).
+   - Floor datum formula `y = floor_y - height` ensures all room bottoms sit flush upon the level girder regardless of variable ceiling heights.
+2. **Top-Down Circular Blueprint Projection & Animated Transition (`physical_world.gd`)**:
+   - Isolating a level triggers a smooth animated wireframe line transition (`floor_plan_transition` lerp) from vertical cutaway to top-down circular blueprint.
+   - Circular floor plan arranges the central stair & elevator core in the middle ($R \le 54$ px), special/service facilities in the inner ring ($R \approx 145$ px), and residential apartments along outer radial sectors ($R \approx 250 - 340$ px) with radial hallways, compass markers (North/South/East/West), and concentric outer bulkheads.
+   - Resident red dots smoothly lerp from cutaway coordinates to radial blueprint coordinates.
+3. **Solid Opaque Tactical Blue / Cyan Console (`physical_world.gd`)**:
+   - Right-hand telemetry panel and top header bar use 100% opaque slate navy backgrounds (`Color(0.024, 0.051, 0.086, 1.0)`) with tactical cyan borders and ice blue/electric cyan/white typography.
+   - World wireframe geometry never bleeds through UI text regardless of zoom or pan.
+4. **Structured Human-Readable Entity Formatting (`physical_world.gd`)**:
+   - Replaced raw JSON dictionary outputs with dedicated bulleted formatters for citizens, resident bed assignments, households, assigned workers with on-site/off-site status, enrolled students, and machinery.
+5. **Robust Global Input & Sub-Tick Motion**:
+   - Global `_input(event)` intercepts Spacebar for pause toggle; all UI buttons set to `focus_mode = FOCUS_NONE`.
+   - Added 0.5× speed toggle and continuous visual position interpolation (`person_visual_positions`) for smooth dot motion.
+
+### Consequences
+- Resolves all user feedback items cleanly while preserving strict simulation determinism and read-model decoupling.
+- Delivers seamless visual switching between vertical cutaway overview and circular top-down architectural blueprint.
+- Headless test suites remain 100% passing (888/888 assertions).
+
 
