@@ -526,4 +526,39 @@ Following user playtesting and feedback on the physical presentation slice:
 - Retains high GPU framerate (58+ FPS) via batched single-pass vector drawing.
 - 100% test pass rate across all headless regression test suites (888/888 assertions).
 
+---
+
+## ADR-020: Information, Propaganda, Censorship & Epistemic Divergence (Sprint 15)
+
+### Context
+A realistic post-disaster underground society cannot rely on perfect, omnipresent knowledge. Information dissemination is inherently physical, institutional, and social:
+1. Physical events occur authoritatively in `WorldState` (e.g. pipe ruptures, resource shortages, illicit diversion).
+2. The administration communicates via official broadcast channels, bulletin boards, and workplace announcements, often redacting, delaying, or denying incidents.
+3. Citizens hold bounded mental models (`CitizenBelief`), where eyewitnesses retain unshakeable confidence in direct experience while non-witnesses evaluate claims based on source credibility, institutional trust, and social network ties.
+4. Suppressing an announcement must never delete simulation truth or rewrite witness memories.
+
+### Decision
+1. **Authoritative Information Model (`InformationObject`)**:
+   - Represents announcements, notices, leaks, or rumors.
+   - Preserves `truth_basis` (immutable dictionary of physical facts) alongside `claim` (the asserted framing, which may omit, spin, or fabricate facts).
+   - Lifecycle states: `ACTIVE`, `DELAYED`, `REDACTED`, `SUPPRESSED`, `DENIED`.
+2. **Bounded Citizen Belief Model (`CitizenBelief`)**:
+   - Stored per citizen as `person.beliefs[event_id]`.
+   - Tracks `has_direct_experience`, `known_truth`, `believed_claim`, `confidence`, and `doubt`.
+   - Bounded by `MAX_HEARD_CLAIMS = 5` to ensure permanent memory bounds and interactive 1,200-resident performance.
+3. **Censorship != Deletion Invariant**:
+   - Calling `suppress_information()` halts broadcast delivery over official channels, but leaves `truth_basis`, inventory mass balances, and witness memories intact.
+4. **Cognitive Divergence & Eyewitness Propaganda Detection**:
+   - When an eyewitness (`has_direct_experience == true`) receives a contradictory official denial, their confidence in their own truth remains 1.0, skepticism towards the administration surges, and institutional trust drops.
+   - When conflicting claims are heard by non-witnesses, ideological alignment (faction ties) and social network trust dictate adoption.
+5. **Word-of-Mouth Network Propagation (`SocialGraph`)**:
+   - Convinced citizens and witnesses spread claims along coworker and household edges during shift handovers, reinforcing belief conviction.
+6. **Observability & Invariants**:
+   - `InformationInvariants` validates ID monotonicity, truth preservation, bounded memory, and deterministic replay (`Run A == Run B`).
+   - `InformationReader` exposes read models for information objects, citizen beliefs, competing narratives, and censorship logs.
+
+### Consequences
+- True epistemic divergence: factions and social classes form differing beliefs about the same physical silo reality.
+- Headless verification: 64 new assertions passing with zero test regressions and 100% determinism.
+
 

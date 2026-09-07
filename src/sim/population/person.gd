@@ -4,6 +4,7 @@ extends RefCounted
 
 const OpinionMemory = preload("res://src/sim/politics/opinion_memory.gd")
 const PoliticalEvent = preload("res://src/sim/politics/political_event.gd")
+const CitizenBelief = preload("res://src/sim/politics/citizen_belief.gd")
 
 const SEX_FEMALE: int = 0
 const SEX_MALE: int = 1
@@ -89,6 +90,9 @@ var faction_id: int = 0
 var sympathiser_faction_id: int = 0
 
 var opinion_memories: Array[Dictionary] = []
+
+# Information & Belief State (Sprint 15)
+var beliefs: Dictionary = {} # event_id (String) -> CitizenBelief
 
 func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int = SEX_FEMALE, p_birth_tick: int = 0) -> void:
 	id = p_id
@@ -396,11 +400,30 @@ func recalculate_political_attitudes(current_tick: int) -> void:
 	confidence_security = clampf(base_sec + delta_sec, 0.0, 1.0)
 	confidence_engineering = clampf(base_eng + delta_eng, 0.0, 1.0)
 
+func record_belief(event_id: String, belief: CitizenBelief) -> void:
+	beliefs[event_id] = belief
+
+func get_belief(event_id: String) -> CitizenBelief:
+	return beliefs.get(event_id, null) as CitizenBelief
+
+func has_belief(event_id: String) -> bool:
+	return beliefs.has(event_id)
+
+func record_direct_experience(event_id: String, topic: String, truth: Dictionary) -> void:
+	var b: CitizenBelief = CitizenBelief.new(event_id, topic, true, truth)
+	beliefs[event_id] = b
+
 func serialize() -> Dictionary:
 	var memories_data: Array[Dictionary] = []
 	for m in opinion_memories:
 		memories_data.append(m.duplicate())
 		
+	var beliefs_data: Dictionary = {}
+	for k in beliefs.keys():
+		var b: CitizenBelief = beliefs[k] as CitizenBelief
+		if b:
+			beliefs_data[k] = b.serialize()
+
 	return {
 		"id": id,
 		"first_name": first_name,
@@ -450,7 +473,8 @@ func serialize() -> Dictionary:
 		"preference_hierarchy": preference_hierarchy,
 		"faction_id": faction_id,
 		"sympathiser_faction_id": sympathiser_faction_id,
-		"opinion_memories": memories_data
+		"opinion_memories": memories_data,
+		"beliefs": beliefs_data
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -517,3 +541,12 @@ func deserialize(data: Dictionary) -> void:
 	for m in data.get("opinion_memories", []):
 		if m is Dictionary:
 			opinion_memories.append(m.duplicate())
+			
+	beliefs = {}
+	var b_data: Dictionary = data.get("beliefs", {})
+	for k in b_data.keys():
+		var b_dict: Dictionary = b_data[k] as Dictionary
+		if b_dict:
+			var cb: CitizenBelief = CitizenBelief.new()
+			cb.deserialize(b_dict)
+			beliefs[k] = cb
