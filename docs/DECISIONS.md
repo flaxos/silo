@@ -359,3 +359,40 @@ Political movements, interest groups, and factions in deep colony/habitat simula
 - Replay determinism (`Run A == Run B`) and observer invisibility are strictly maintained.
 - Provides the structural foundation for Sprint 14 (Corruption, Patronage & Informal Power) and Sprint 15 (Strikes, Sabotage & Industrial Action).
 
+---
+
+## ADR-016: Informal Power, Patronage Networks & Epistemic Audit Discrepancies
+
+### Status
+Accepted
+
+### Context
+In hierarchical human societies subjected to scarce material resources and institutional rationing, official organizational charts and formal authority diverge from actual informal power. Bureaucrats, technicians, and officials divert resources, grant favors, and offer protection to relatives, friends, and political allies. Commonly in simulation games, corruption is modeled as a passive statistical tax or global modifier. In Project SILO, corruption must adhere to strict material conservation ($\Delta \text{Mass} = 0$), maintain epistemic divergence between official paperwork and ground reality, and propagate consequences along bounded social and institutional channels.
+
+### Decision
+1. **Informal Power & Patronage Graphs (`src/sim/politics/patronage_network.gd`)**:
+   - Model informal power as a composite metric of formal clearance, tenure seniority, education score, faction influence, social network size, and actively held, unsettled favors owed by clients ($+12.0$ power per held favor debt).
+   - Indebted clients suffer reduced autonomy and increased compliance to patron requests.
+   - Detect patron-client clusters and calculate conflict-of-interest (COI) indices based on kinship ties, shared workplaces, and overlapping departmental jurisdictions.
+2. **First-Class Informal Obligations (`src/sim/politics/favour.gd`)**:
+   - Model informal debts as `Favour` objects tracking `granter_id`, `recipient_id`, `creation_tick`, `favour_type`, `obligation_value` ($0.0$ to $1.0$), and settlement lifecycle (`is_settled`, `settled_tick`).
+3. **Mass-Conserving Illicit Diversion & Epistemic Discrepancies (`src/sim/politics/illicit_action.gd`, `src/sim/politics/corruption_system.gd`)**:
+   - `CorruptionSystem` (`execution_order = 37`) evaluates temptation from disaffection, opportunity (clearance and workplace inventory access), and social pressure (needy relatives/clients).
+   - Resource diversion physically transfers materials between inventory entities, strictly conserving mass.
+   - Creates an official record discrepancy: the official ledger (`ws.custom_data["official_inventory_ledgers"]`) continues to record old higher stock values, while physical inventory is lower.
+   - The gap constitutes hidden discrepancy tracked on `IllicitAction` with a `concealment_level` ($0.0$ to $1.0$).
+4. **Organic Discovery, Auditing & Sanctions**:
+   - Discovery occurs through two organic mechanisms: (1) Whistleblowing by honest co-workers or rival faction members in the perpetrator's social graph, or (2) Routine and manual institutional security audits.
+   - Upon exposure, institutional sanctions (clearance demotion, formal warnings) apply, generating acute negative opinion memories (`EVENT_DISCIPLINARY_SANCTION`, `EVENT_CORRUPTION_DISCOVERED`), and official inventory records are reconciled to match physical ground truth.
+5. **Invariant Validation (`src/sim/politics/corruption_invariants.gd`)**:
+   - `CorruptionInvariants.validate_all(ws)` verifies entity references, obligation value bounds, discrepancy non-negativity, and verifies that `EconomyInvariants.validate(ws)` confirms total system mass conservation.
+6. **Observability & HTML Viewer Integration**:
+   - Exposed `/api/corruption`, `/api/patronage_network`, `/api/audit_log`, and `/api/illicit_trace` endpoints in `SimulationReader` and `ObserverServer`.
+   - Integrated full "Corruption & Patronage" panel into HTML dashboard with patron cluster cards, illicit action registries, COI matrix, and 7-step causal audit trace inspector.
+
+### Consequences
+- Official reports can lie while physical inventories never do: players and systems must audit to reconcile records.
+- Favor trading creates organic shadow alliances and nepotistic protection networks that undermine formal policy decrees.
+- Full deterministic replayability (`Run A == Run B`) and observer invisibility are maintained.
+- Provides the foundation for Sprint 15 (Strikes, Sabotage & Industrial Action) and Sprint 16 (Black Markets & Contraband).
+

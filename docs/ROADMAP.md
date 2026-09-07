@@ -165,6 +165,11 @@ The SILO roadmap is strictly sequenced. Each sprint is gated by automated accept
 - **Deliverables**: Bounded social graph (`social_graph.gd`), authoritative `Faction` entity, organic emergence and recruitment engine (`faction_system.gd`), person affiliation state, dynamic grievance agendas, policy approval matrices, inter-faction rivalry/coalition dynamics, invariant validation (`faction_invariants.gd`), and HTML observability console integration (`/api/factions`, `/api/faction_detail`, `/api/social_network`).
 - **Acceptance Gate**: Deterministic stress scenario where aggrieved worker clusters form movements, elect organic leaders, recruit along social edges, and calculate dynamic policy approvals; 100% determinism (`Run A == Run B`); all 789 headless test assertions pass across 20 test suites with 0 failures.
 
+### Sprint 14 — Corruption, Patronage & Informal Power (Completed)
+- **Hypothesis**: In hierarchical habitats under scarce resource rationing, official authority diverges from actual informal power, generating shadow favour trading, nepotistic protection, and epistemic discrepancies between official records and physical truth.
+- **Deliverables**: Informal power network modeling (`patronage_network.gd`), authoritative favours ledger (`favour.gd`), illicit diversion actions (`illicit_action.gd`), corruption evaluation and audit reconciliation system (`corruption_system.gd`), invariant validation (`corruption_invariants.gd`), and HTML observability console integration (`/api/corruption`, `/api/patronage_network`, `/api/audit_log`, `/api/illicit_trace`).
+- **Acceptance Gate**: Multi-week deterministic scenario modeling mass-conserving resource diversion ($\Delta \text{Mass} = 0$), epistemic ledger discrepancy creation, whistleblower discovery via social graph, institutional sanctions, and audit ledger reconciliation; 100% determinism (`Run A == Run B`); all 830 headless test assertions pass across 21 test suites with 0 failures.
+
 ---
 
 ## Advanced Phases (Sprints 13–45)

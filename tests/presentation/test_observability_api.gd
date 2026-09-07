@@ -127,7 +127,7 @@ func test_22_system_wiring_matrix(asserts: TestAsserts) -> void:
 	var ws: WorldState = engine.get_world_state()
 	
 	var matrix: Array[Dictionary] = SimulationReader.get_wiring_matrix(ws)
-	asserts.assert_eq(matrix.size(), 25, "Matrix must track all 25 authoritative simulation systems")
+	asserts.assert_eq(matrix.size(), 27, "Matrix must track all 27 authoritative simulation systems")
 	
 	for entry in matrix:
 		asserts.assert_eq(entry["status"], "GREEN", "System %s must report GREEN status" % entry["system"])

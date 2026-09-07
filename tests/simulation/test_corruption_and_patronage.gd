@@ -238,9 +238,18 @@ func test_whistleblower_social_graph_discovery(asserts: TestAsserts) -> void:
 	var pids: Array[int] = ws.entity_registry.get_entities_by_type("person")
 	var perp: Person = ws.entity_registry.get_entity(pids[0]) as Person
 	var ben: Person = ws.entity_registry.get_entity(pids[1]) as Person
+	var coworker: Person = ws.entity_registry.get_entity(pids[2]) as Person
+	
+	# Ensure perp and coworker share a workplace so coworker is connected in SocialGraph
+	if perp.workplace_room_id <= 0:
+		perp.workplace_room_id = 1
+	coworker.workplace_room_id = perp.workplace_room_id
+	coworker.institutional_trust = 0.85
+	coworker.perceived_fairness = 0.80
 	
 	var rids: Array[int] = ws.entity_registry.get_entities_by_type("room")
 	var src_inv: Inventory = _ensure_room_inventory(ws, rids[0])
+	var _dst_inv: Inventory = _ensure_room_inventory(ws, rids[1])
 	src_inv.add_resource("machined_bearing", 10.0)
 	
 	# Execute with very low concealment so coworkers/whistleblowers detect it quickly
