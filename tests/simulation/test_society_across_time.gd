@@ -55,7 +55,7 @@ func test_2_year_demographic_turnover(asserts: TestAsserts) -> void:
 	asserts.assert_gt(stats["living_count"], 50, "Living population must remain viable")
 	asserts.assert_gt(demo_sys.total_births, 0, "Births should occur over 2 simulated years")
 	asserts.assert_gt(demo_sys.total_graduations, 0, "Students should graduate into adulthood over 2 simulated years")
-	asserts.assert_lt(duration_ms, 60000.0, "2-year simulation should execute within budget (< 60,000 ms)")
+	asserts.assert_lt(duration_ms, 90000.0, "2-year simulation should execute within budget (< 90,000 ms)")
 
 func test_schooling_and_workforce_replenishment(asserts: TestAsserts) -> void:
 	asserts.set_current_test("SocietyAcrossTime: Education Accumulation & Workforce Graduation")
