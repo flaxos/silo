@@ -1,8 +1,10 @@
 # CURRENT_SPRINT.md — Active Sprint Tracking
 
 ```
-CURRENT: Sprint 15 — Propaganda, Information & Censorship (In Progress)
-NEXT: Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (Pending Sprint 15 Gate)
+CURRENT: Sprint 17 — Crime & Underground Economy (In Progress)
+NEXT: Sprint 18 — Advanced Policing, Investigation & Justice (Pending Sprint 17 Gate)
+PREVIOUS: Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (Completed & Verified)
+PREVIOUS: Sprint 15 — Propaganda, Information & Censorship (Completed & Verified)
 PREVIOUS: Physical Layer / Godot Wireframe Integration (Completed & Verified)
 PREVIOUS: Sprint 14 — Corruption, Patronage & Informal Power (Completed & Verified)
 PREVIOUS: Sprint 13 — Factions, Movements & Social Networks (Completed & Verified)
@@ -12,42 +14,45 @@ PREVIOUS: Sprint 12 — Political Identity & Legitimacy (Completed & Verified)
 
 ---
 
-## 1. Active Sprint: Sprint 15 — Propaganda, Information & Censorship
+## 1. Active Sprint: Sprint 17 — Crime & Underground Economy
 
 ### Goal
-Turn information into a simulated, persistent resource and political weapon. Different citizens know, believe, doubt, miss, or reinterpret underlying events based on channel access, social graph edges, trust, source credibility, and prior experience. Underlying simulation truth is never mutated by propaganda or censorship.
+Create systemic crime arising from real motive, opportunity, scarcity, relationships and institutional conditions. Crime must alter actual simulation state (diverting inventories, altering ledgers, contraband circulation, physical theft) rather than incrementing an abstract crime meter.
 
 ### Deliverables Checklist
-- [x] Bounded authoritative information object model (`src/sim/politics/information_object.gd`) with truth basis, claims, certainty, credibility, and censorship status.
-- [x] Bounded citizen knowledge & belief state (`src/sim/politics/citizen_belief.gd`, integrated into `Person`).
-- [x] Multi-tier information channels (`src/sim/politics/information_channel.gd`, `src/sim/politics/information_system.gd`): official announcements, notice boards, workplace comms, faction channels, word-of-mouth rumours over `SocialGraph`.
-- [x] Institutional & player communications actions: publish, delay, redact, suppress, leak, deny. Suppression prevents dissemination without deleting underlying events or formed memories.
-- [x] Causal integration with corruption/patronage truth (audits, illicit actions, discrepancies generate competing information objects).
-- [x] Observability endpoints and read models: active information, claims vs truth, channel reach, censorship state, citizen knowledge inspection (`src/presentation/information_reader.gd`, `/api/information`, `/api/competing_narratives`, `/api/censorship_log`).
-- [x] Headless test suite (`tests/simulation/test_information_and_propaganda.gd` — 64 assertions passing).
-
-### Acceptance Gate Criteria for Sprint 15
-1. **Divergent Beliefs Across Social Networks**: One real event produces different beliefs based on channel access, faction ties, and social network proximity.
-2. **Censorship != Deletion**: Suppressing information restricts channel dissemination; underlying `WorldState` truth, physical evidence, and existing witness memories remain untouched.
-3. **Corruption Integration**: Illicit diversions and audit findings organically generate competing claims (official denial vs whistleblower leak).
-4. **Determinism & Invariants**: `InformationInvariants` validates ID monotonicity, truth-basis integrity, and deterministic replay (`Run A == Run B`).
-5. **Zero Test Regressions**: All previous 23 test suites (888 assertions) pass with 0 failures, exit code 0.
-6. **1200 Resident Performance**: Event-driven and bounded social propagation remains within interactive simulation budget.
+- [ ] Bounded authoritative Crime / Offence model (`src/sim/politics/crime.gd`): types (theft, inventory diversion, contraband, assault, vandalism, record manipulation), perpetrator, victim/target, location, opportunity, motive, evidence chain, concealment.
+- [ ] Bounded underground economy & black market transactions (`src/sim/politics/underground_economy.gd`): illicit buyers/sellers, black market inventory, contraband pricing, material conservation.
+- [ ] Crime & Illicit Trade System (`src/sim/politics/crime_system.gd`): evaluation of motive (scarcity, grievance, greed) and opportunity (clearance, off-shift access, lack of surveillance), physical item theft/diversion.
+- [ ] Physical evidence generation (`evidence_trace.gd` / logs): access records, witnesses, inventory discrepancies.
+- [ ] Observability read model & API endpoints (`src/presentation/crime_reader.gd`, `/api/crimes`, `/api/black_market`, `/api/contraband_registry`).
+- [ ] Invariant validator (`src/sim/politics/crime_invariants.gd`): strictly enforces mass conservation, entity existence, evidence validity.
+- [ ] Headless test suite (`tests/simulation/test_crime_and_underground_economy.gd`).
 
 ---
 
-## 2. Next Sprint: Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion
+## 2. Previous Sprint: Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (COMPLETED & VERIFIED)
 
-### Goal
-Allow political conflict, faction grievances, and divergent information beliefs to emerge as real collective action (petitions, slowdowns, strikes, sabotage, protests, civil disobedience) carried out by identified, persistent citizens with physical, economic, and institutional consequences.
+### Deliverables Checklist
+- [x] Authoritative collective action model (`src/sim/politics/collective_action.gd`): strikes, protests, slowdowns, sabotage with identified participants.
+- [x] Systemic collective action management (`src/sim/politics/collective_action_system.gd`): strike organisation, picket diversion, physical sabotage, dual resolution paths.
+- [x] Grounded labour withdrawal: integrated with `DailyLifeSystem` via `ws.custom_data["striking_person_ids"]`; halts production naturally without synthetic modifiers.
+- [x] Physical machinery sabotage: directly damages machine components (`MachineComponent.wear_percent`), causing degradation and fault states.
+- [x] Dual resolution paths: concessions (returns labour, boosts trust) vs crackdown (breaks strike, spikes resentment).
+- [x] Invariant validation (`src/sim/politics/collective_action_invariants.gd`): entity validity, non-empty participants, mass conservation, determinism.
+- [x] Observability endpoints & read model: `CollectiveActionReader`, `/api/collective_actions`, `/api/active_strikes`, `/api/sabotage_reports`.
+- [x] Headless test suite (`tests/simulation/test_collective_action_and_rebellion.gd` — 34 assertions passing).
 
-### Acceptance Gate Criteria for Sprint 16
-1. **Identified Participants**: Collective actions involve actual citizens (no generic crowd spawns).
-2. **Labour Withdrawal & Downstream Production**: Striking workers stop scheduled labour; actual resource extraction and downstream production fall through physical laws without artificial modifiers.
-3. **Information Feedback Loop**: Collective action emergence depends on Sprint 15 information environments (credible leaks trigger action; successful censorship delays or prevents it).
-4. **Physical Sabotage**: Saboteurs inflict targeted, physical component damage adhering to machinery degradation models.
-5. **Systemic Resolution**: Demonstrates at least two resolution paths (concessions returning labour vs coercive response altering trust/resentment).
-6. **Zero Test Regressions & Determinism**: All test suites pass with 0 failures; deterministic replay verified.
+---
+
+## 3. Previous Sprint: Sprint 15 — Propaganda, Information & Censorship (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Bounded authoritative information object model (`src/sim/politics/information_object.gd`).
+- [x] Bounded citizen knowledge & belief state (`src/sim/politics/citizen_belief.gd`).
+- [x] Multi-tier information channels (`src/sim/politics/information_channel.gd`, `src/sim/politics/information_system.gd`).
+- [x] Institutional & player actions: publish, delay, redact, suppress, leak, deny. Censorship != deletion.
+- [x] Invariants, Read Models & APIs (`src/presentation/information_reader.gd`, `/api/information`, `/api/competing_narratives`, `/api/censorship_log`).
+- [x] Headless test suite (`tests/simulation/test_information_and_propaganda.gd` — 64 assertions passing).
 
 ---
 

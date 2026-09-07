@@ -170,6 +170,16 @@ The SILO roadmap is strictly sequenced. Each sprint is gated by automated accept
 - **Deliverables**: Informal power network modeling (`patronage_network.gd`), authoritative favours ledger (`favour.gd`), illicit diversion actions (`illicit_action.gd`), corruption evaluation and audit reconciliation system (`corruption_system.gd`), invariant validation (`corruption_invariants.gd`), and HTML observability console integration (`/api/corruption`, `/api/patronage_network`, `/api/audit_log`, `/api/illicit_trace`).
 - **Acceptance Gate**: Multi-week deterministic scenario modeling mass-conserving resource diversion ($\Delta \text{Mass} = 0$), epistemic ledger discrepancy creation, whistleblower discovery via social graph, institutional sanctions, and audit ledger reconciliation; 100% determinism (`Run A == Run B`); all 830 headless test assertions pass across 21 test suites with 0 failures.
 
+### Sprint 15 — Propaganda, Information & Censorship (Completed)
+- **Hypothesis**: Information operates as an authoritative, simulated resource and political instrument where epistemic divergence emerges naturally from channel access, social graph proximity, trust, and physical witness experience.
+- **Deliverables**: Authoritative information object model (`information_object.gd`), bounded citizen belief state (`citizen_belief.gd`), multi-tier distribution channels (`information_channel.gd`, `information_system.gd`), institutional actions (publish, delay, redact, suppress, leak, deny), invariant validation (`information_invariants.gd`), and HTML observability console integration (`/api/information`, `/api/competing_narratives`, `/api/censorship_log`).
+- **Acceptance Gate**: Divergent beliefs across social networks; censorship does not mutate simulation truth or delete witness memories; corruption whistleblowing generates competing claims; all 888+ headless test assertions pass with 0 failures.
+
+### Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (Completed)
+- **Hypothesis**: Political conflict, faction grievances, and divergent beliefs coalesce into physical collective actions (strikes, protests, slowdowns, sabotage) carried out by identified citizens with real economic and infrastructural consequences.
+- **Deliverables**: Authoritative collective action model (`collective_action.gd`), systemic collective action engine (`collective_action_system.gd`), grounded labor withdrawal via `DailyLifeSystem` halting production naturally, targeted physical machinery sabotage degrading component health (`MachineComponent.wear_percent`), dual resolution paths (concessions vs crackdown), invariant validation (`collective_action_invariants.gd`), and observability endpoints (`/api/collective_actions`, `/api/active_strikes`, `/api/sabotage_reports`).
+- **Acceptance Gate**: Striking workers stop scheduled labor halting physical production chains; physical sabotage damages machine components; concessions restore labor while crackdowns spike resentment; 100% determinism (`Run A == Run B`); all 986 headless test assertions pass across 25 test suites with 0 failures.
+
 ---
 
 ## Advanced Phases (Sprints 13–45)

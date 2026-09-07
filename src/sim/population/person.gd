@@ -370,9 +370,13 @@ func recalculate_political_attitudes(current_tick: int) -> void:
 			PoliticalEvent.EVENT_COERCIVE_ORDER:
 				delta_trust += imp * 0.4
 				delta_fairness += imp * 0.3
+				delta_resentment -= imp * 0.5
 			PoliticalEvent.EVENT_CRISIS_RESOLVED:
 				delta_security += imp * 0.4
 				delta_lead += imp * 0.3
+				delta_trust += imp * 0.4
+				delta_fairness += imp * 0.4
+				delta_resentment -= imp * 0.3
 			PoliticalEvent.EVENT_CORRUPTION_DISCOVERED:
 				delta_trust += imp * 0.5 # imp is negative
 				delta_fairness += imp * 0.5

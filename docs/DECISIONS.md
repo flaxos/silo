@@ -561,4 +561,41 @@ A realistic post-disaster underground society cannot rely on perfect, omnipresen
 - True epistemic divergence: factions and social classes form differing beliefs about the same physical silo reality.
 - Headless verification: 64 new assertions passing with zero test regressions and 100% determinism.
 
+---
+
+## ADR-021: Collective Resistance, Strikes, Sabotage & Industrial Feedback (Sprint 16)
+
+### Status
+Accepted
+
+### Context
+Political tension, class resentment, and epistemic divergence must have material consequences. In authoritarian underground societies, suppressed grievances manifest not in abstract "rebellion meters", but through physical withdrawal of labor (strikes, slowdowns), public demonstrations (pickets, protests), and targeted physical attacks (machinery sabotage). These actions must involve real, identified citizens and cause downstream economic and infrastructural effects through physical simulation laws rather than artificial modifiers.
+
+### Decision
+1. **Authoritative Collective Action Model (`CollectiveAction`)**:
+   - Types: `STRIKE`, `PROTEST`, `SLOWDOWN`, `SABOTAGE`, `CIVIL_DISOBEDIENCE`.
+   - Identified actors: designated `organizer_person_id` and explicit list of `participant_ids`. No anonymous crowd units or abstract numbers.
+   - Grounded targets: target `workplace_room_id`, target `machine_id` + `component_id`, or policy grievances.
+   - Lifecycle states: `PLANNED`, `ACTIVE`, `CONCEDED`, `SUPPRESSED`, `COLLAPSED`.
+2. **Grounded Labor Withdrawal (`CollectiveActionSystem` & `DailyLifeSystem`)**:
+   - `CollectiveActionSystem` (`execution_order = 39`) tracks active strikes and maintains `ws.custom_data["striking_person_ids"]`.
+   - `DailyLifeSystem` intercepts scheduled work shifts for striking citizens, replacing work with picketing/protest activity.
+   - Because `ProductionSystem` strictly requires physical worker presence at the workplace room, resource extraction (such as geological seam mining) and downstream processing automatically stop completely without synthetic modifiers.
+3. **Physical Machinery Sabotage**:
+   - Saboteurs inflict direct wear on real `MachineComponent` records (`comp.wear_percent += severity`), directly degrading machine operating states (`STATE_NOMINAL -> STATE_FAULT`) and cutting physical throughput (e.g. water pumping rate).
+4. **Information Loop Integration**:
+   - Whistleblower leaks and exposed corruption from Sprint 15 trigger collective action; institutional censorship and suppression delay or prevent collective awareness.
+5. **Dual Resolution Paths**:
+   - `grant_concessions()`: Accepts worker demands, returns labor to workplaces, boosts institutional trust, and de-escalates class resentment.
+   - `enforce_crackdown()`: Disperses action by force, breaks the strike, returns workers under duress, but severely degrades institutional trust and spikes resentment, laying the ground for future radicalization.
+6. **Invariants & Observability**:
+   - `CollectiveActionInvariants` validates entity presence, participant identification, target validity, and deterministic state hashing (`Run A == Run B`).
+   - `CollectiveActionReader` provides read-only models for active strikes, affected workplaces, and sabotage logs. Observer server exposes `/api/collective_actions`, `/api/active_strikes`, and `/api/sabotage_reports`.
+
+### Consequences
+- True bottom-up political friction: economic disruption emerges directly from human labor withdrawal and physical machine faults.
+- Complete determinism and headless test coverage (34 assertions, 0 failures).
+- Seamless continuation into Phase B (Law, Crime, Justice & Human Behavior).
+
+
 
