@@ -32,6 +32,9 @@ const SUITES: Dictionary = {
 		"res://tests/simulation/test_corruption_and_patronage.gd",
 		"res://tests/simulation/test_information_and_propaganda.gd",
 		"res://tests/simulation/test_collective_action_and_rebellion.gd",
+		"res://tests/simulation/test_crime_and_underground_economy.gd",
+		"res://tests/simulation/test_policing_and_justice.gd",
+		"res://tests/simulation/test_psychology_and_stress.gd",
 	],
 	"presentation": [
 		"res://tests/presentation/test_simulation_viewer.gd",

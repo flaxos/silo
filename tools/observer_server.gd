@@ -16,6 +16,15 @@ const InformationReader = preload("res://src/presentation/information_reader.gd"
 const CollectiveActionSystem = preload("res://src/sim/politics/collective_action_system.gd")
 const CollectiveActionInvariants = preload("res://src/sim/politics/collective_action_invariants.gd")
 const CollectiveActionReader = preload("res://src/presentation/collective_action_reader.gd")
+const CrimeSystem = preload("res://src/sim/law/crime_system.gd")
+const CrimeInvariants = preload("res://src/sim/law/crime_invariants.gd")
+const CrimeReader = preload("res://src/presentation/crime_reader.gd")
+const SecuritySystem = preload("res://src/sim/law/security_system.gd")
+const SecurityInvariants = preload("res://src/sim/law/security_invariants.gd")
+const SecurityReader = preload("res://src/presentation/security_reader.gd")
+const PsychologySystem = preload("res://src/sim/population/psychology_system.gd")
+const PsychologyInvariants = preload("res://src/sim/population/psychology_invariants.gd")
+const PsychologyReader = preload("res://src/presentation/psychology_reader.gd")
 
 var server: TCPServer
 var port: int = DEFAULT_PORT
@@ -28,6 +37,9 @@ var fact_sys: FactionSystem
 var corr_sys: CorruptionSystem
 var info_sys: InformationSystem
 var action_sys: CollectiveActionSystem
+var crime_sys: CrimeSystem
+var sec_sys: SecuritySystem
+var psych_sys: PsychologySystem
 var daily_life: DailyLifeSystem
 var prod_sys: ProductionSystem
 var maint_sys: MaintenanceSystem
@@ -123,6 +135,9 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	corr_sys = CorruptionSystem.new()
 	info_sys = InformationSystem.new()
 	action_sys = CollectiveActionSystem.new()
+	crime_sys = CrimeSystem.new()
+	sec_sys = SecuritySystem.new()
+	psych_sys = PsychologySystem.new()
 	daily_life = DailyLifeSystem.new()
 	prod_sys = ProductionSystem.new()
 	maint_sys = MaintenanceSystem.new()
@@ -135,6 +150,9 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	engine.register_system(corr_sys)
 	engine.register_system(info_sys)
 	engine.register_system(action_sys)
+	engine.register_system(crime_sys)
+	engine.register_system(sec_sys)
+	engine.register_system(psych_sys)
 	engine.register_system(daily_life)
 	engine.register_system(maint_sys)
 	engine.register_system(prod_sys)
@@ -431,6 +449,35 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 		["GET", "/api/sabotage_reports"]:
 			response_data = {"sabotage_incidents": CollectiveActionReader.get_sabotage_log(ws)}
 			
+		["GET", "/api/crimes"]:
+			response_data = CrimeReader.get_crime_summary(ws)
+			
+		["GET", "/api/crimes_list"]:
+			response_data = {"crimes": CrimeReader.get_all_crimes(ws)}
+			
+		["GET", "/api/black_market"]:
+			response_data = CrimeReader.get_black_market_summary(ws)
+			
+		["GET", "/api/crime_trace"]:
+			var cid: int = int(query_params.get("id", query_params.get("crime_id", 1)))
+			response_data = CrimeReader.get_crime_trace(ws, cid)
+			
+		["GET", "/api/security_cases"]:
+			response_data = {"cases": SecurityReader.get_all_cases(ws)}
+			
+		["GET", "/api/security_summary"]:
+			response_data = SecurityReader.get_security_summary(ws)
+			
+		["GET", "/api/detainees"]:
+			response_data = {"detainees": SecurityReader.get_detainees(ws)}
+			
+		["GET", "/api/psychology_summary"]:
+			response_data = PsychologyReader.get_population_psychology_summary(ws)
+			
+		["GET", "/api/person_psychology"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = PsychologyReader.get_person_psychology(ws, pid)
+			
 		["GET", "/api/illicit_trace"]:
 			var aid: int = int(query_params.get("id", query_params.get("action_id", 0)))
 			if aid <= 0:
@@ -495,10 +542,13 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 			var corr_val: Dictionary = CorruptionInvariants.validate_all(ws)
 			var info_val: Dictionary = InformationInvariants.validate_all(ws)
 			var action_val: Dictionary = CollectiveActionInvariants.validate_all(ws)
+			var crime_val: Dictionary = CrimeInvariants.validate_all(ws)
+			var sec_val: Dictionary = SecurityInvariants.validate_all(ws)
+			var psych_val: Dictionary = PsychologyInvariants.validate_all(ws)
 			var econ_sum: Dictionary = SimulationReader.get_economy_summary(ws)
 			var mach_sum: Dictionary = SimulationReader.get_machinery_summary(ws)
 			
-			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and info_val.get("is_valid", true) and action_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
+			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and info_val.get("is_valid", true) and action_val.get("is_valid", true) and crime_val.get("is_valid", true) and sec_val.get("is_valid", true) and psych_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
 			response_data = {
 				"is_valid": all_ok,
 				"checksum": ws.get_state_checksum(),
@@ -508,6 +558,9 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"corruption_validation": corr_val,
 				"information_validation": info_val,
 				"collective_action_validation": action_val,
+				"crime_validation": crime_val,
+				"security_validation": sec_val,
+				"psychology_validation": psych_val,
 				"mass_balance": {
 					"total_mass_kg": econ_sum["total_system_mass_kg"],
 					"seam_ore_kg": econ_sum["seam_ore_kg"],

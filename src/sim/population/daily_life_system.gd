@@ -194,10 +194,10 @@ func tick(world_state: Variant) -> void:
 					desired_activity = Person.ACTIVITY_IDLE
 					desired_room_id = p.home_room_id
 
-		# 2b. Labour withdrawal: striking workers refuse work and join picket/gathering
-		if desired_activity == Person.ACTIVITY_WORKING and striking_map.has(p.id):
-			desired_activity = Person.ACTIVITY_RECREATING
-			var gather_room: int = int(striking_map[p.id])
+		# 2b. Labour withdrawal: striking or absent workers refuse work
+		if desired_activity == Person.ACTIVITY_WORKING and (striking_map.has(p.id) or p.absent_from_work):
+			desired_activity = Person.ACTIVITY_RECREATING if striking_map.has(p.id) else Person.ACTIVITY_SLEEPING
+			var gather_room: int = int(striking_map.get(p.id, 0))
 			desired_room_id = gather_room if gather_room > 0 else p.home_room_id
 
 		# 3. Check if spatial transition is required

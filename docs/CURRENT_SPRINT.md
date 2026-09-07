@@ -1,8 +1,10 @@
 # CURRENT_SPRINT.md — Active Sprint Tracking
 
 ```
-CURRENT: Sprint 17 — Crime & Underground Economy (In Progress)
-NEXT: Sprint 18 — Advanced Policing, Investigation & Justice (Pending Sprint 17 Gate)
+CURRENT: Sprint 20 — Relationships, Romance & Household Dynamics (Planned / Next)
+PREVIOUS: Sprint 19 — Psychology, Stress & Adaptation (Completed & Verified)
+PREVIOUS: Sprint 18 — Advanced Policing, Investigation & Justice (Completed & Verified)
+PREVIOUS: Sprint 17 — Crime & Underground Economy (Completed & Verified)
 PREVIOUS: Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (Completed & Verified)
 PREVIOUS: Sprint 15 — Propaganda, Information & Censorship (Completed & Verified)
 PREVIOUS: Physical Layer / Godot Wireframe Integration (Completed & Verified)
@@ -14,19 +16,48 @@ PREVIOUS: Sprint 12 — Political Identity & Legitimacy (Completed & Verified)
 
 ---
 
-## 1. Active Sprint: Sprint 17 — Crime & Underground Economy
+## 1. Active Sprint: Sprint 20 — Relationships, Romance & Household Dynamics (READY / NEXT)
 
 ### Goal
-Create systemic crime arising from real motive, opportunity, scarcity, relationships and institutional conditions. Crime must alter actual simulation state (diverting inventories, altering ledgers, contraband circulation, physical theft) rather than incrementing an abstract crime meter.
+Make interpersonal life materially influence generations, households, politics, and wellbeing. Model friendship, romance, family dynamics, and household formation/splitting emerging from physical proximity and co-working rather than arbitrary pairing.
+
+---
+
+## 2. Previous Sprint: Sprint 19 — Psychology, Stress & Adaptation (COMPLETED & VERIFIED)
 
 ### Deliverables Checklist
-- [ ] Bounded authoritative Crime / Offence model (`src/sim/politics/crime.gd`): types (theft, inventory diversion, contraband, assault, vandalism, record manipulation), perpetrator, victim/target, location, opportunity, motive, evidence chain, concealment.
-- [ ] Bounded underground economy & black market transactions (`src/sim/politics/underground_economy.gd`): illicit buyers/sellers, black market inventory, contraband pricing, material conservation.
-- [ ] Crime & Illicit Trade System (`src/sim/politics/crime_system.gd`): evaluation of motive (scarcity, grievance, greed) and opportunity (clearance, off-shift access, lack of surveillance), physical item theft/diversion.
-- [ ] Physical evidence generation (`evidence_trace.gd` / logs): access records, witnesses, inventory discrepancies.
-- [ ] Observability read model & API endpoints (`src/presentation/crime_reader.gd`, `/api/crimes`, `/api/black_market`, `/api/contraband_registry`).
-- [ ] Invariant validator (`src/sim/politics/crime_invariants.gd`): strictly enforces mass conservation, entity existence, evidence validity.
-- [ ] Headless test suite (`tests/simulation/test_crime_and_underground_economy.gd`).
+- [x] Bounded psychological state on Person (`stress`, `fatigue`, `morale`, `burnout`, `absent_from_work` in `src/sim/population/person.gd`).
+- [x] Grounded psychological dynamics (`src/sim/population/psychology_system.gd`): sleep restoration, shift fatigue accumulation, dangerous work stress, dehydration penalties, chronic burnout.
+- [x] Systemic consequences: emergent worker absenteeism (`absent_from_work = true`) withdrawing scheduled labor via `DailyLifeSystem` and halting physical production; operator fatigue jitter causing extra machine wear.
+- [x] Invariant validation (`src/sim/population/psychology_invariants.gd`): verifies [0, 100] bounds for all living residents.
+- [x] Observability endpoints & read model: `PsychologyReader`, `/api/psychology_summary`, `/api/person_psychology`.
+- [x] Headless test suite (`tests/simulation/test_psychology_and_stress.gd` — 19 assertions passing).
+
+---
+
+## 3. Previous Sprint: Sprint 18 — Advanced Policing, Investigation & Justice (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Authoritative case lifecycle model (`src/sim/law/security_case.gd`): open, investigating, warrant, arrested, convicted, closed; suspect scoring from physical traces.
+- [x] Grounded security system (`src/sim/law/security_system.gd`): officer shift dispatch, IT policy surveillance retrieval, log retention expiration, physical arrest and cell detention.
+- [x] Physical labor withdrawal: arrested/convicted workers held in security post rooms (`Room.TYPE_SECURITY_POST`), withdrawing labor from production lines; sentence duration tracking and release.
+- [x] Adjudication and wrongful conviction mechanics: wrongful convictions spike resentment and erode institutional trust.
+- [x] Invariant validation (`src/sim/law/security_invariants.gd`): verifies valid cases, officers, and detainee states.
+- [x] Observability endpoints & read model: `SecurityReader`, `/api/security_cases`, `/api/security_summary`, `/api/detainees`.
+- [x] Headless test suite (`tests/simulation/test_policing_and_justice.gd` — 26 assertions passing).
+
+---
+
+## 4. Previous Sprint: Sprint 17 — Crime & Underground Economy (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Bounded authoritative Crime / Offence model (`src/sim/law/crime_incident.gd`): types (theft, inventory diversion, contraband, assault, vandalism, record manipulation), perpetrator, victim/target, location, opportunity, motive, evidence chain, concealment.
+- [x] Bounded underground economy & black market transactions (`src/sim/law/underground_economy.gd`): illicit buyers/sellers, black market trades, risk pricing, physical mass conservation ($\Delta \text{Mass} = 0$).
+- [x] Crime & Illicit Trade System (`src/sim/law/crime_system.gd`): evaluation of motive and opportunity, physical item diversion, component vandalism.
+- [x] Physical evidence generation: badge swipe logs, CCTV records, eyewitness observations, inventory discrepancies.
+- [x] Invariant validation (`src/sim/law/crime_invariants.gd`): mass conservation via `EconomyInvariants`, entity existence, evidence validity.
+- [x] Observability read model & API endpoints (`src/presentation/crime_reader.gd`, `/api/crimes`, `/api/crimes_list`, `/api/black_market`, `/api/crime_trace`).
+- [x] Headless test suite (`tests/simulation/test_crime_and_underground_economy.gd` — 36 assertions passing).
 
 ---
 

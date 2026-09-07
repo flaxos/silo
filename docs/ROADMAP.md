@@ -180,6 +180,21 @@ The SILO roadmap is strictly sequenced. Each sprint is gated by automated accept
 - **Deliverables**: Authoritative collective action model (`collective_action.gd`), systemic collective action engine (`collective_action_system.gd`), grounded labor withdrawal via `DailyLifeSystem` halting production naturally, targeted physical machinery sabotage degrading component health (`MachineComponent.wear_percent`), dual resolution paths (concessions vs crackdown), invariant validation (`collective_action_invariants.gd`), and observability endpoints (`/api/collective_actions`, `/api/active_strikes`, `/api/sabotage_reports`).
 - **Acceptance Gate**: Striking workers stop scheduled labor halting physical production chains; physical sabotage damages machine components; concessions restore labor while crackdowns spike resentment; 100% determinism (`Run A == Run B`); all 986 headless test assertions pass across 25 test suites with 0 failures.
 
+### Sprint 17 — Crime & Underground Economy (Completed)
+- **Hypothesis**: Systemic crime arises from real motive, opportunity, scarcity, relationships, and institutional conditions, altering physical simulation state (inventories, ledgers, components) without arbitrary meters.
+- **Deliverables**: Authoritative crime model (`crime_incident.gd`), underground economy exchange engine (`underground_economy.gd`), crime execution system (`crime_system.gd`), physical evidence generation (badge logs, CCTV, eyewitnesses, discrepancies), invariant validation (`crime_invariants.gd`), and observability endpoints (`/api/crimes`, `/api/crimes_list`, `/api/black_market`, `/api/crime_trace`).
+- **Acceptance Gate**: Physical item theft and diversion conserve mass ($\Delta \text{Mass} = 0$); physical evidence generated; component vandalism degrades machine state; 100% determinism; all 36 headless assertions pass with 0 failures.
+
+### Sprint 18 — Advanced Policing, Investigation & Justice (Completed)
+- **Hypothesis**: Security operates as a staffed operational institution rather than an omniscient button, where investigations depend on physical evidence availability governed by IT policies, and arrests physically withdraw labor.
+- **Deliverables**: Authoritative case model (`security_case.gd`), operational security system (`security_system.gd`), IT CCTV/badge access integration, cell detention in security posts, physical labor withdrawal, sentencing and release, wrongful conviction resentment feedback, invariant validation (`security_invariants.gd`), and observability endpoints (`/api/security_cases`, `/api/security_summary`, `/api/detainees`).
+- **Acceptance Gate**: IT surveillance access controls materially alter investigative outcomes; detained suspects withdraw labor from production lines; sentences expire and release prisoners; wrongful convictions generate resentment; all 26 headless assertions pass with 0 failures.
+
+### Sprint 19 — Psychology, Stress & Adaptation (Completed)
+- **Hypothesis**: Citizens maintain persistent internal psychological states driven by lived bodily and environmental conditions, driving concrete behavioral consequences (absenteeism, operator fatigue errors) without synthetic global morale modifiers.
+- **Deliverables**: Bounded psychological state on `Person` (`stress`, `fatigue`, `morale`, `burnout`, `absent_from_work`), grounded psychological system (`psychology_system.gd`), emergent worker absenteeism withdrawing scheduled labor via `DailyLifeSystem`, fatigue-induced machinery wear jitter, recreation restoration, invariant validation (`psychology_invariants.gd`), and observability endpoints (`/api/psychology_summary`, `/api/person_psychology`).
+- **Acceptance Gate**: Cohort divergence under stress/fatigue; emergent absenteeism halts production lines naturally; fatigued operators inflict extra wear on machines; all 19 headless assertions pass with 0 failures.
+
 ---
 
 ## Advanced Phases (Sprints 13–45)

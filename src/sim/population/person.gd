@@ -94,6 +94,13 @@ var opinion_memories: Array[Dictionary] = []
 # Information & Belief State (Sprint 15)
 var beliefs: Dictionary = {} # event_id (String) -> CitizenBelief
 
+# Psychological & Stress State (Sprint 19)
+var stress: float = 20.0       # 0.0 to 100.0
+var fatigue: float = 10.0      # 0.0 to 100.0
+var morale: float = 70.0       # 0.0 to 100.0
+var burnout: float = 0.0       # 0.0 to 100.0
+var absent_from_work: bool = false
+
 func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int = SEX_FEMALE, p_birth_tick: int = 0) -> void:
 	id = p_id
 	first_name = p_first
@@ -115,6 +122,11 @@ func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int 
 	seniority_level = 0
 	faction_id = 0
 	sympathiser_faction_id = 0
+	stress = 20.0
+	fatigue = 10.0
+	morale = 70.0
+	burnout = 0.0
+	absent_from_work = false
 	
 	occupation_id = "unassigned"
 	department_id = ""
@@ -477,6 +489,11 @@ func serialize() -> Dictionary:
 		"preference_hierarchy": preference_hierarchy,
 		"faction_id": faction_id,
 		"sympathiser_faction_id": sympathiser_faction_id,
+		"stress": stress,
+		"fatigue": fatigue,
+		"morale": morale,
+		"burnout": burnout,
+		"absent_from_work": absent_from_work,
 		"opinion_memories": memories_data,
 		"beliefs": beliefs_data
 	}
@@ -540,6 +557,11 @@ func deserialize(data: Dictionary) -> void:
 	preference_hierarchy = float(data.get("preference_hierarchy", 0.5))
 	faction_id = int(data.get("faction_id", 0))
 	sympathiser_faction_id = int(data.get("sympathiser_faction_id", 0))
+	stress = float(data.get("stress", 20.0))
+	fatigue = float(data.get("fatigue", 10.0))
+	morale = float(data.get("morale", 70.0))
+	burnout = float(data.get("burnout", 0.0))
+	absent_from_work = bool(data.get("absent_from_work", false))
 	
 	opinion_memories = []
 	for m in data.get("opinion_memories", []):
