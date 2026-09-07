@@ -59,6 +59,19 @@ var floor_plan_transition := 0.0
 var dragging := false
 var drag_last := Vector2.ZERO
 
+enum {
+	VIEW_CUTAWAY = 0,
+	VIEW_ISOMETRIC = 1,
+	VIEW_FLOOR_PLAN = 2
+}
+var view_mode: int = VIEW_CUTAWAY
+var room_label_mode: int = 0 # 0: FULL (Text + Icon + Cap), 1: ICONS ONLY (Icon + ID), 2: OFF
+var view_button: Button
+var labels_button: Button
+var room_iso_rect_cache: Dictionary = {}
+var initial_view_mode: Variant = null
+var initial_label_mode: Variant = null
+
 var panel: PanelContainer
 var details_label: RichTextLabel
 var telemetry_label: RichTextLabel
@@ -89,6 +102,12 @@ func _ready() -> void:
 	_build_indexes()
 	_build_camera()
 	_build_ui()
+	if initial_view_mode != null:
+		_set_view_mode(int(initial_view_mode))
+	if initial_label_mode != null:
+		room_label_mode = int(initial_label_mode)
+		_update_label_button_text()
+
 	if initial_select_room > 0 and room_by_id.has(initial_select_room):
 		_select("room", str(initial_select_room), initial_select_room)
 		_focus_room(initial_select_room, custom_zoom if custom_zoom > 0.0 else 1.0)
@@ -98,11 +117,14 @@ func _ready() -> void:
 		var first_id: int = int(people_by_id.keys()[0])
 		_select("person", str(first_id), int(people_by_id[first_id].get("location_id", 0)))
 
-	if isolated_level != null:
+	if isolated_level != null and view_mode != VIEW_ISOMETRIC:
 		_apply_isolated_level(int(isolated_level))
 		floor_plan_transition = 1.0
 	elif custom_zoom > 0.0:
 		camera.zoom = Vector2.ONE * custom_zoom
+		if initial_select_room == 0 and initial_select_person == 0:
+			var center_pt := _whole_silo_rect().get_center()
+			camera.position = Vector2(center_pt.x + (192.0 / custom_zoom), center_pt.y)
 	elif initial_select_room == 0 and initial_select_person == 0:
 		call_deferred("_fit_whole")
 	set_process(true)
@@ -147,6 +169,30 @@ func _parse_args() -> void:
 			initial_select_person = args[i + 1].to_int(); i += 2
 		elif arg.begins_with("--select-person="):
 			initial_select_person = arg.substr(16).to_int(); i += 1
+		elif arg == "--view" and i + 1 < args.size():
+			var vm := args[i + 1].to_lower()
+			if vm == "isometric" or vm == "iso": initial_view_mode = VIEW_ISOMETRIC
+			elif vm == "floorplan" or vm == "topdown" or vm == "blueprint": initial_view_mode = VIEW_FLOOR_PLAN
+			else: initial_view_mode = VIEW_CUTAWAY
+			i += 2
+		elif arg.begins_with("--view="):
+			var vm := arg.substr(7).to_lower()
+			if vm == "isometric" or vm == "iso": initial_view_mode = VIEW_ISOMETRIC
+			elif vm == "floorplan" or vm == "topdown" or vm == "blueprint": initial_view_mode = VIEW_FLOOR_PLAN
+			else: initial_view_mode = VIEW_CUTAWAY
+			i += 1
+		elif arg == "--labels" and i + 1 < args.size():
+			var lm := args[i + 1].to_lower()
+			if lm == "icons" or lm == "icon": initial_label_mode = 1
+			elif lm == "off" or lm == "none": initial_label_mode = 2
+			else: initial_label_mode = 0
+			i += 2
+		elif arg.begins_with("--labels="):
+			var lm := arg.substr(9).to_lower()
+			if lm == "icons" or lm == "icon": initial_label_mode = 1
+			elif lm == "off" or lm == "none": initial_label_mode = 2
+			else: initial_label_mode = 0
+			i += 1
 		else: i += 1
 
 func _boot_simulation() -> void:
@@ -207,6 +253,12 @@ func _build_ui() -> void:
 		_style_tactical_button(button); bar.add_child(button)
 		speed_buttons[spec[1]] = button
 
+	view_button = Button.new(); view_button.text = "VIEW: CUTAWAY [V]"; view_button.focus_mode = Control.FOCUS_NONE
+	view_button.pressed.connect(_cycle_view_mode); _style_tactical_button(view_button); bar.add_child(view_button)
+
+	labels_button = Button.new(); labels_button.text = "TAGS: FULL [L]"; labels_button.focus_mode = Control.FOCUS_NONE
+	labels_button.pressed.connect(_cycle_label_mode); _style_tactical_button(labels_button); bar.add_child(labels_button)
+
 	var fit := Button.new(); fit.text = "FIT [F]"; fit.focus_mode = Control.FOCUS_NONE
 	fit.pressed.connect(_fit_whole); _style_tactical_button(fit); bar.add_child(fit)
 
@@ -260,7 +312,7 @@ func _build_ui() -> void:
 	follow_button = Button.new(); follow_button.text = "TRACK CITIZEN [G]"; follow_button.disabled = true; follow_button.focus_mode = Control.FOCUS_NONE
 	follow_button.pressed.connect(_toggle_follow); _style_tactical_button(follow_button); side.add_child(follow_button)
 
-	var help := Label.new(); help.text = "W/A/S/D / RMB: Pan   Wheel: Zoom   F: Whole Silo\nI: Isolate (Top-Down Blueprint)   G: Track Citizen   Space: Pause"
+	var help := Label.new(); help.text = "W/A/S/D / RMB: Pan   Wheel: Zoom   F: Fit   Space: Pause\nV: View (Cutaway/Iso/Plan)   L: Labels (Full/Icons/Off)   I: Isolate   G: Track"
 	help.add_theme_color_override("font_color", UI_MUTED); side.add_child(help)
 
 	_update_status()
@@ -305,14 +357,32 @@ func _style_tactical_item_list(il: ItemList) -> void:
 	il.add_theme_stylebox_override("panel", sb)
 
 func _input(event: InputEvent) -> void:
+	# Release LineEdit focus if clicking anywhere outside the search box
+	if event is InputEventMouseButton and event.pressed:
+		if search_edit and search_edit.has_focus():
+			var s_rect := search_edit.get_global_rect()
+			if not s_rect.has_point(event.position):
+				search_edit.release_focus()
+
 	# Dedicated global keyboard handling ensuring Spacebar ALWAYS pauses unless typing in LineEdit
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_SPACE:
 			if search_edit and search_edit.has_focus():
+				# If search box is empty or only whitespace, unfocus and toggle pause!
+				if search_edit.text.strip_edges().is_empty():
+					search_edit.text = ""
+					search_edit.release_focus()
+					_toggle_pause()
+					get_viewport().set_input_as_handled()
+					return
 				return
 			_toggle_pause()
 			get_viewport().set_input_as_handled()
 			return
+		elif event.keycode == KEY_V:
+			_cycle_view_mode(); get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_L:
+			_cycle_label_mode(); get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_1:
 			_set_speed(0.5); get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_2:
@@ -328,7 +398,17 @@ func _input(event: InputEvent) -> void:
 		elif event.keycode == KEY_G:
 			_toggle_follow(); get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_ESCAPE:
-			isolated_level = null; follow_person_id = 0; queue_redraw()
+			if search_edit and search_edit.has_focus():
+				search_edit.release_focus()
+				search_edit.text = ""
+				_search("")
+				get_viewport().set_input_as_handled()
+				return
+			isolated_level = null
+			follow_person_id = 0
+			if view_mode == VIEW_FLOOR_PLAN:
+				_set_view_mode(VIEW_CUTAWAY)
+			queue_redraw()
 			get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -438,9 +518,63 @@ func _update_speed_buttons() -> void:
 
 func _update_status() -> void:
 	if not status_label: return
-	var clock: Dictionary = snapshot.get("clock", {})
+	var year: int = 1; var day: int = 1; var hour: int = 0; var minute: int = 0; var tick_num: int = 0
+	if ws and ws.sim_clock:
+		year = ws.sim_clock.get_year()
+		day = ws.sim_clock.get_day_of_year()
+		hour = ws.sim_clock.get_hour_of_day()
+		minute = ws.sim_clock.get_minute_of_hour()
+		tick_num = ws.sim_clock.get_tick()
+	else:
+		var clock: Dictionary = snapshot.get("clock", {})
+		year = int(clock.get("year", 1))
+		day = int(clock.get("day_of_year", clock.get("day", 1)))
+		hour = int(clock.get("hour", 0))
+		minute = int(clock.get("minute", 0))
+		tick_num = int(clock.get("tick", snapshot.get("revision", 0)))
 	var state_text := "[⏸ PAUSED]" if speed == 0.0 else "[▶ RUNNING %.1f×]" % speed
-	status_label.text = "Year %s · Day %s · %s  |  %s  |  %d RESIDENTS (RED DOTS)  |  TICK %s" % [clock.get("year", 1), clock.get("day_of_year", clock.get("day", 1)), clock.get("time", clock.get("time_string", "00:00")), state_text, people_by_id.size(), snapshot.get("revision", 0)]
+	status_label.text = "Year %d · Day %d · %02d:%02d  |  %s  |  %d RESIDENTS (RED DOTS)  |  TICK %d" % [
+		year, day, hour, minute, state_text, people_by_id.size(), tick_num
+	]
+
+func _cycle_view_mode() -> void:
+	_set_view_mode((view_mode + 1) % 3)
+
+func _set_view_mode(mode: int) -> void:
+	view_mode = mode
+	match view_mode:
+		VIEW_CUTAWAY:
+			isolated_level = null
+			floor_plan_transition = 0.0
+			if view_button: view_button.text = "VIEW: CUTAWAY [V]"
+			if isolate_button: isolate_button.text = "ISOLATE [I]"
+		VIEW_ISOMETRIC:
+			isolated_level = null
+			floor_plan_transition = 0.0
+			if view_button: view_button.text = "VIEW: ISOMETRIC [V]"
+			if isolate_button: isolate_button.text = "ISOLATE [I]"
+		VIEW_FLOOR_PLAN:
+			if isolated_level == null:
+				var target_l := 1
+				if selected_room_id > 0 and room_by_id.has(selected_room_id):
+					target_l = int(room_by_id[selected_room_id].get("level", 1))
+				_apply_isolated_level(target_l)
+			floor_plan_transition = 1.0
+			if view_button: view_button.text = "VIEW: FLOOR PLAN [V]"
+	_fit_whole()
+	queue_redraw()
+
+func _cycle_label_mode() -> void:
+	room_label_mode = (room_label_mode + 1) % 3
+	_update_label_button_text()
+	queue_redraw()
+
+func _update_label_button_text() -> void:
+	if not labels_button: return
+	match room_label_mode:
+		0: labels_button.text = "TAGS: FULL [L]"
+		1: labels_button.text = "TAGS: ICONS [L]"
+		2: labels_button.text = "TAGS: OFF [L]"
 
 func _update_telemetry() -> void:
 	if not telemetry_label: return
@@ -459,7 +593,11 @@ func _update_telemetry() -> void:
 		var q_len: int = q_val.size() if q_val is Array else int(q_val)
 		max_stair_queue = maxi(max_stair_queue, q_len)
 
-	var view_mode_text := "[color=#00e5ff]TOP-DOWN CIRCULAR BLUEPRINT (LEVEL %s)[/color]" % str(isolated_level) if isolated_level != null else "[color=#00e5ff]VERTICAL CYLINDER CUTAWAY (20 LEVELS)[/color]"
+	var view_mode_text: String
+	match view_mode:
+		VIEW_ISOMETRIC: view_mode_text = "[color=#00e5ff]3D ISOMETRIC AXONOMETRIC SILO (20 LEVELS)[/color]"
+		VIEW_FLOOR_PLAN: view_mode_text = "[color=#00e5ff]TOP-DOWN CIRCULAR BLUEPRINT (LEVEL %s)[/color]" % str(isolated_level)
+		_: view_mode_text = "[color=#00e5ff]VERTICAL CYLINDER CUTAWAY (20 LEVELS)[/color]"
 
 	var lines: Array[String] = [
 		"VIEW: %s" % view_mode_text,
@@ -474,11 +612,14 @@ func _update_telemetry() -> void:
 func _draw() -> void:
 	if geometry.is_empty(): return
 	var start := Time.get_ticks_usec()
-	_draw_rock_and_levels()
-	_draw_stairs()
-	_draw_rooms()
-	_draw_machines_and_incidents()
-	_draw_people()
+	if view_mode == VIEW_ISOMETRIC:
+		_draw_isometric_world()
+	else:
+		_draw_rock_and_levels()
+		_draw_stairs()
+		_draw_rooms()
+		_draw_machines_and_incidents()
+		_draw_people()
 	draw_usec_total += Time.get_ticks_usec() - start
 
 func _draw_rock_and_levels() -> void:
@@ -555,7 +696,7 @@ func _draw_rock_and_levels() -> void:
 			var ltitle := _level_title(lid)
 			draw_string(ThemeDB.fallback_font, Vector2(cx_left - 260, float(level.get("y", 0.0)) + 24), ltitle, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col_bright)
 
-	# 3. Top-Down Circular Floor Plan Blueprint (Fades in smoothly when isolating a floor!)
+	# 3. Top-Down Circular Floor Plan Blueprint with Interconnected Architectural Hallways
 	if blueprint_alpha > 0.01 and isolated_level != null:
 		var bp_center := Vector2(0.0, _level_center_y(int(isolated_level)))
 		var bp_mid := Color(WIRE_MID.r, WIRE_MID.g, WIRE_MID.b, WIRE_MID.a * blueprint_alpha)
@@ -563,24 +704,19 @@ func _draw_rock_and_levels() -> void:
 		var bp_dim := Color(WIRE_DIM.r, WIRE_DIM.g, WIRE_DIM.b, WIRE_DIM.a * blueprint_alpha)
 		var bp_dark := Color(WIRE_DARK.r, WIRE_DARK.g, WIRE_DARK.b, WIRE_DARK.a * blueprint_alpha)
 
-		# Outer Silo Cylindrical Casing Rings (Radius 400 & 385)
+		# Outer Silo Cylindrical Casing Rings (Radius 405, 388, 375)
 		draw_arc(bp_center, 405.0, 0.0, TAU, 64, bp_mid, 2.0)
 		draw_arc(bp_center, 388.0, 0.0, TAU, 64, bp_bright, 2.5)
 		draw_arc(bp_center, 375.0, 0.0, TAU, 64, bp_dim, 1.5)
-		for sp in range(24):
-			var ang := float(sp) * (TAU / 24.0)
-			draw_line(bp_center + Vector2(cos(ang), sin(ang)) * 375.0, bp_center + Vector2(cos(ang), sin(ang)) * 405.0, bp_dim, 1.0)
+		for sp in range(32):
+			var ang := float(sp) * (TAU / 32.0)
+			draw_line(bp_center + Vector2(cos(ang), sin(ang)) * 375.0, bp_center + Vector2(cos(ang), sin(ang)) * 405.0, bp_dim, 1.2)
 
-		# Concentric Circular Corridors
-		draw_arc(bp_center, 215.0, 0.0, TAU, 48, bp_dim, 1.5)
-		draw_arc(bp_center, 78.0, 0.0, TAU, 36, bp_mid, 2.0)
+		# Perimeter Ring Hallway (Radius 348 to 372)
+		draw_arc(bp_center, 372.0, 0.0, TAU, 64, bp_mid, 1.5)
+		draw_arc(bp_center, 348.0, 0.0, TAU, 64, bp_mid, 1.5)
 
-		# Radial Hallway Spokes spanning outwards to residential sectors
-		for sp in range(8):
-			var ang := float(sp) * (TAU / 8.0)
-			draw_line(bp_center + Vector2(cos(ang), sin(ang)) * 78.0, bp_center + Vector2(cos(ang), sin(ang)) * 375.0, bp_dark, 1.5)
-
-		# Central Circulation Core (Stair & Elevator Hub)
+		# Central Circulation Core (Stair & Elevator Hub, R <= 54)
 		draw_arc(bp_center, 54.0, 0.0, TAU, 32, bp_bright, 2.5)
 		draw_rect(Rect2(bp_center - Vector2(30, 30), Vector2(60, 60)), CRT_BG, true)
 		draw_rect(Rect2(bp_center - Vector2(30, 30), Vector2(60, 60)), bp_bright, false, 2.0)
@@ -591,12 +727,338 @@ func _draw_rock_and_levels() -> void:
 		draw_line(Vector2(bp_center.x - 24, bp_center.y - 25), Vector2(bp_center.x - 24, bp_center.y + 25), bp_bright, 2.0)
 		draw_line(Vector2(bp_center.x + 24, bp_center.y - 25), Vector2(bp_center.x + 24, bp_center.y + 25), bp_bright, 2.0)
 
-		# Blueprint Compass & Sector Labels
-		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-60, -420), "▲ NORTH // RADIAL SECTOR A", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
-		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-60, 435), "▼ SOUTH // RADIAL SECTOR C", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
-		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-540, 5), "◀ WEST // SECTOR D", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
-		draw_string(ThemeDB.fallback_font, bp_center + Vector2(420, 5), "▶ EAST // SECTOR B", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
-		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-90, -60), "CENTRAL STAIR & LIFT CORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, bp_bright)
+		# Central Ring Hallway (Radius 56 to 96, 40 px wide walkway)
+		draw_arc(bp_center, 96.0, 0.0, TAU, 48, bp_mid, 2.0)
+		for sp in range(24):
+			var ang := float(sp) * (TAU / 24.0)
+			draw_line(bp_center + Vector2(cos(ang), sin(ang)) * 56.0, bp_center + Vector2(cos(ang), sin(ang)) * 96.0, bp_dark, 1.0)
+
+		# 4 Main Cardinal Avenue Corridors (Double walls with floor tile cross-lines)
+		# North Avenue (Sector A)
+		draw_line(bp_center + Vector2(-16, -96), bp_center + Vector2(-16, -348), bp_bright, 2.0)
+		draw_line(bp_center + Vector2(16, -96), bp_center + Vector2(16, -348), bp_bright, 2.0)
+		for y_off in range(110, 340, 22):
+			draw_line(bp_center + Vector2(-14, -y_off), bp_center + Vector2(14, -y_off), bp_dark, 1.0)
+
+		# South Avenue (Sector C)
+		draw_line(bp_center + Vector2(-16, 96), bp_center + Vector2(-16, 348), bp_bright, 2.0)
+		draw_line(bp_center + Vector2(16, 96), bp_center + Vector2(16, 348), bp_bright, 2.0)
+		for y_off in range(110, 340, 22):
+			draw_line(bp_center + Vector2(-14, y_off), bp_center + Vector2(14, y_off), bp_dark, 1.0)
+
+		# East Avenue (Sector B)
+		draw_line(bp_center + Vector2(96, -16), bp_center + Vector2(348, -16), bp_bright, 2.0)
+		draw_line(bp_center + Vector2(96, 16), bp_center + Vector2(348, 16), bp_bright, 2.0)
+		for x_off in range(110, 340, 22):
+			draw_line(bp_center + Vector2(x_off, -14), bp_center + Vector2(x_off, 14), bp_dark, 1.0)
+
+		# West Avenue (Sector D)
+		draw_line(bp_center + Vector2(-96, -16), bp_center + Vector2(-348, -16), bp_bright, 2.0)
+		draw_line(bp_center + Vector2(-96, 16), bp_center + Vector2(-348, 16), bp_bright, 2.0)
+		for x_off in range(110, 340, 22):
+			draw_line(bp_center + Vector2(-x_off, -14), bp_center + Vector2(-x_off, 14), bp_dark, 1.0)
+
+		# 4 Diagonal Secondary Branch Corridors (Width 24 px)
+		for sp in [1, 3, 5, 7]:
+			var ang := float(sp) * (TAU / 8.0)
+			var dir := Vector2(cos(ang), sin(ang))
+			var perp := Vector2(-dir.y, dir.x) * 12.0
+			draw_line(bp_center + dir * 165.0 + perp, bp_center + dir * 348.0 + perp, bp_mid, 1.5)
+			draw_line(bp_center + dir * 165.0 - perp, bp_center + dir * 348.0 - perp, bp_mid, 1.5)
+			draw_line(bp_center + dir * 165.0, bp_center + dir * 348.0, bp_dark, 1.0)
+
+		# Doorway Thresholds connecting rooms to hallways
+		for room in geometry.get("rooms", []):
+			if int(room.get("level", 0)) != int(isolated_level): continue
+			var r_rect := _room_rect_topdown(room)
+			var rtype := int(room.get("room_type", 0))
+			if rtype == 0: # Residential apartment directly attached to cardinal avenue
+				var r_center := r_rect.get_center()
+				var dx_from_c := r_center.x - bp_center.x
+				var dy_from_c := r_center.y - bp_center.y
+				if absf(dx_from_c) > absf(dy_from_c): # East or West Avenue
+					var door_y := bp_center.y + (16.0 if dy_from_c > 0 else -16.0)
+					draw_line(Vector2(r_center.x - 8.0, door_y), Vector2(r_center.x + 8.0, door_y), bp_bright, 2.5)
+				else: # North or South Avenue
+					var door_x := bp_center.x + (16.0 if dx_from_c > 0 else -16.0)
+					draw_line(Vector2(door_x, r_center.y - 8.0), Vector2(door_x, r_center.y + 8.0), bp_bright, 2.5)
+			else:
+				var d_center := r_rect.get_center()
+				var d_vec := (d_center - bp_center).normalized()
+				var door_p := d_center - d_vec * (minf(r_rect.size.x, r_rect.size.y) * 0.48)
+				draw_line(door_p - Vector2(d_vec.y, -d_vec.x) * 8.0, door_p + Vector2(d_vec.y, -d_vec.x) * 8.0, bp_bright, 2.5)
+
+		# Blueprint Compass & Sector Avenue Labels
+		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-95, -425), "▲ NORTH // MAIN AVENUE (SECTOR A)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
+		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-95, 440), "▼ SOUTH // MAIN AVENUE (SECTOR C)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
+		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-600, 5), "◀ WEST // MAIN AVENUE (SECTOR D)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
+		draw_string(ThemeDB.fallback_font, bp_center + Vector2(425, 5), "▶ EAST // MAIN AVENUE (SECTOR B)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, bp_bright)
+		draw_string(ThemeDB.fallback_font, bp_center + Vector2(-95, -60), "CENTRAL STAIR & LIFT HUB", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, bp_bright)
+
+func _iso_project(r: float, angle_rad: float, level_idx: float) -> Vector2:
+	var wx: float = r * cos(angle_rad)
+	var wy: float = r * sin(angle_rad)
+	var iso_x: float = (wx - wy) * 0.866025
+	var iso_y: float = (wx + wy) * 0.5 + level_idx * 115.0
+	return Vector2(iso_x, iso_y)
+
+func _draw_isometric_world() -> void:
+	var z := camera.zoom.x
+	var levels: Array = geometry.get("levels", [])
+	if levels.is_empty(): return
+
+	var num_levels: int = levels.size()
+
+	# 1. Dark Bedrock Background
+	var b_rect := _whole_silo_rect().grow(500.0)
+	draw_rect(b_rect, ROCK_BG, true)
+
+	# 2. Outer Bedrock Cavern Strata (Jagged rock walls enclosing the cylinder)
+	var r_outer := 365.0
+	var r_shaft := 68.0
+
+	for l_idx in range(num_levels):
+		var rock_left := _iso_project(r_outer + 35.0, PI * 0.5, float(l_idx))
+		var rock_right := _iso_project(r_outer + 35.0, 0.0, float(l_idx))
+		draw_line(rock_left + Vector2(-180, (l_idx % 4) * 8), rock_left, WIRE_DARK, 1.0)
+		draw_line(rock_right, rock_right + Vector2(180, ((l_idx + 2) % 4) * 8), WIRE_DARK, 1.0)
+
+		# Horizontal Tunnel Breaches into Rock (Levels 4, 10, 16)
+		if l_idx in [3, 9, 15]:
+			var t_l1 := rock_left
+			var t_l2 := rock_left + Vector2(-150, -20)
+			draw_line(t_l1, t_l2, WIRE_MID, 1.5)
+			draw_line(t_l1 + Vector2(0, -32), t_l2 + Vector2(0, -32), WIRE_MID, 1.5)
+			draw_line(t_l2, t_l2 + Vector2(0, -32), WIRE_BRIGHT, 2.0)
+			if z >= 0.35:
+				draw_string(ThemeDB.fallback_font, t_l2 + Vector2(-110, -10), "MINING CONDUIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, WIRE_DIM)
+
+	# 3. Central Vertical Shaft (Octagonal guide column lines from Level 1 to 20)
+	for sp in range(8):
+		var a := float(sp) * TAU / 8.0
+		var pt_top := _iso_project(r_shaft, a, -0.4)
+		var pt_bot := _iso_project(r_shaft, a, float(num_levels) - 0.5)
+		draw_line(pt_top, pt_bot, WIRE_DARK, 1.0)
+
+	# 4. Vertical Elevator Guide Rails & Moving Lift Cabs
+	var elev_a1 := _iso_project(r_shaft * 0.88, PI * 0.75, -0.4)
+	var elev_a2 := _iso_project(r_shaft * 0.88, PI * 0.75, float(num_levels) - 0.5)
+	var elev_b1 := _iso_project(r_shaft * 0.88, PI * 1.75, -0.4)
+	var elev_b2 := _iso_project(r_shaft * 0.88, PI * 1.75, float(num_levels) - 0.5)
+	draw_line(elev_a1, elev_a2, WIRE_BRIGHT, 2.0)
+	draw_line(elev_b1, elev_b2, WIRE_BRIGHT, 2.0)
+
+	var tick_f: float = float(ws.sim_clock.get_tick() if (ws and ws.sim_clock) else 0) + tick_accumulator
+	var cab_l1 := fmod(tick_f * 0.12, float(num_levels))
+	var cab_l2 := fmod(float(num_levels) * 0.6 + tick_f * 0.08, float(num_levels))
+	var cab1_pos := _iso_project(r_shaft * 0.88, PI * 0.75, cab_l1)
+	var cab2_pos := _iso_project(r_shaft * 0.88, PI * 1.75, cab_l2)
+	draw_rect(Rect2(cab1_pos - Vector2(7, 12), Vector2(14, 24)), CRT_BG, true)
+	draw_rect(Rect2(cab1_pos - Vector2(7, 12), Vector2(14, 24)), WIRE_BRIGHT, false, 1.5)
+	draw_rect(Rect2(cab2_pos - Vector2(7, 12), Vector2(14, 24)), CRT_BG, true)
+	draw_rect(Rect2(cab2_pos - Vector2(7, 12), Vector2(14, 24)), WIRE_BRIGHT, false, 1.5)
+
+	# 5. Helical Spiral Staircase in Central Core
+	for l_idx in range(num_levels):
+		var steps := 8
+		for s in range(steps):
+			var frac := float(s) / float(steps)
+			var a := frac * TAU - PI * 0.5
+			var cur_l := float(l_idx) + frac
+			var inner_p := _iso_project(18.0, a, cur_l)
+			var outer_p := _iso_project(r_shaft * 0.82, a, cur_l)
+			draw_line(inner_p, outer_p, WIRE_MID, 1.2)
+			if s % 2 == 0:
+				var next_a := (float(s + 1) / float(steps)) * TAU - PI * 0.5
+				var next_outer := _iso_project(r_shaft * 0.82, next_a, cur_l + 1.0 / float(steps))
+				draw_line(outer_p, next_outer, WIRE_BRIGHT, 1.5)
+
+	# 6. Stacked Cylindrical Floor Slabs & Rooms
+	room_iso_rect_cache.clear()
+	for l_idx in range(num_levels):
+		var level_dict: Dictionary = levels[l_idx]
+		var lid := int(level_dict.get("id", l_idx + 1))
+
+		# Floor Slab Cutaway Arc (From theta = 90 deg around the back to 360 deg)
+		var arc_pts: PackedVector2Array = []
+		var arc_steps := 28
+		for s in range(arc_steps + 1):
+			var ang := (PI * 0.5) + float(s) / float(arc_steps) * (PI * 1.5)
+			arc_pts.append(_iso_project(r_outer, ang, float(l_idx)))
+		draw_polyline(arc_pts, WIRE_MID, 2.0)
+
+		# Cutaway Cross-Section Edges (Front 90-degree cutaway exposing interior!)
+		var left_outer := _iso_project(r_outer, PI * 0.5, float(l_idx))
+		var left_inner := _iso_project(r_shaft, PI * 0.5, float(l_idx))
+		var right_outer := _iso_project(r_outer, 0.0, float(l_idx))
+		var right_inner := _iso_project(r_shaft, 0.0, float(l_idx))
+		draw_line(left_outer, left_inner, WIRE_BRIGHT, 2.0)
+		draw_line(right_outer, right_inner, WIRE_BRIGHT, 2.0)
+
+		# Floor Slab Thickness (Edge drop of 8 px)
+		draw_line(left_outer, left_outer + Vector2(0, 8), WIRE_DARK, 1.5)
+		draw_line(left_inner, left_inner + Vector2(0, 8), WIRE_DARK, 1.5)
+		draw_line(left_outer + Vector2(0, 8), left_inner + Vector2(0, 8), WIRE_DARK, 1.2)
+		draw_line(right_outer, right_outer + Vector2(0, 8), WIRE_DARK, 1.5)
+		draw_line(right_inner, right_inner + Vector2(0, 8), WIRE_DARK, 1.5)
+		draw_line(right_outer + Vector2(0, 8), right_inner + Vector2(0, 8), WIRE_DARK, 1.2)
+
+		# Inner Balcony Railing overlooking Central Open Shaft
+		var rail_pts: PackedVector2Array = []
+		for s in range(16):
+			var ang := (PI * 0.5) + float(s) / 15.0 * (PI * 1.5)
+			rail_pts.append(_iso_project(r_shaft, ang, float(l_idx)))
+		draw_polyline(rail_pts, WIRE_BRIGHT, 1.5)
+
+		# Inter-Level Perimeter Diagonal Stairs
+		if l_idx < num_levels - 1:
+			var st_top := _iso_project(r_outer * 0.96, PI * 0.5, float(l_idx))
+			var st_bot := _iso_project(r_outer * 0.96, PI * 0.5, float(l_idx + 1)) + Vector2(35, 0)
+			draw_line(st_top, st_bot, WIRE_BRIGHT, 2.0)
+			for step_i in range(5):
+				var sf := float(step_i) / 4.0
+				var sp := st_top.lerp(st_bot, sf)
+				draw_line(sp - Vector2(4, 0), sp + Vector2(4, 0), WIRE_MID, 1.5)
+
+		# Level Tag
+		draw_string(ThemeDB.fallback_font, left_outer + Vector2(-95, -6), "L%02d" % lid, HORIZONTAL_ALIGNMENT_RIGHT, -1, 12, WIRE_BRIGHT)
+
+		# Collect Rooms on this Level
+		var level_rooms: Array = []
+		for r in geometry.get("rooms", []):
+			if int(r.get("level", 0)) == lid: level_rooms.append(r)
+
+		var total_r := maxi(1, level_rooms.size())
+		for r_idx in range(total_r):
+			var room: Dictionary = level_rooms[r_idx]
+			var rid := int(room.get("id", 0))
+			var rtype := int(room.get("room_type", 0))
+			var selected := selected_type == "room" and selected_id == str(rid)
+
+			# Position room along back cylindrical arc
+			var angle_span := (PI * 1.4) / float(total_r)
+			var a1 := (PI * 0.55) + float(r_idx) * angle_span
+			var a2 := a1 + angle_span * 0.88
+			var r_in := r_shaft + 18.0
+			var r_out := r_outer - 12.0
+
+			var p1 := _iso_project(r_in, a1, float(l_idx))
+			var p2 := _iso_project(r_out, a1, float(l_idx))
+			var p3 := _iso_project(r_out, a2, float(l_idx))
+			var p4 := _iso_project(r_in, a2, float(l_idx))
+
+			var room_poly: PackedVector2Array = [p1, p2, p3, p4]
+			var center_pt := (p1 + p2 + p3 + p4) * 0.25
+			room_iso_rect_cache[rid] = {"center": center_pt, "poly": room_poly, "level": lid}
+
+			# Subtle Category Tint
+			var tint := _room_tint(rtype)
+			draw_colored_polygon(room_poly, Color(tint.r, tint.g, tint.b, 0.12 if selected else 0.04))
+
+			# Floor Boundary Wireframe
+			var b_col := WIRE_ACCENT if selected else (WIRE_BRIGHT if rtype in [2, 7, 10, 11, 16] else WIRE_MID)
+			draw_polyline(PackedVector2Array([p1, p2, p3, p4, p1]), b_col, 2.0 if selected else 1.2)
+
+			# Vertical Wall Extrusions (Receding isometric walls)
+			var wall_h := 45.0
+			var top_p2 := p2 - Vector2(0, wall_h)
+			var top_p3 := p3 - Vector2(0, wall_h)
+			draw_line(p2, top_p2, WIRE_DIM, 1.0)
+			draw_line(p3, top_p3, WIRE_DIM, 1.0)
+			draw_line(top_p2, top_p3, WIRE_DIM, 1.0)
+
+			# Doorway Threshold onto Corridor
+			var door_p1 := p1.lerp(p4, 0.35)
+			var door_p2 := p1.lerp(p4, 0.65)
+			draw_line(door_p1, door_p2, WIRE_BRIGHT, 2.5)
+
+			# Selected Reticle
+			if selected:
+				_draw_corner_brackets(Rect2(center_pt - Vector2(25, 20), Vector2(50, 40)), WIRE_BRIGHT, 6.0, 1.5)
+
+			# Zoomed-In Interior Sketches
+			if z >= 0.55:
+				_draw_iso_interior(rtype, center_pt)
+
+			# Room Icons & Labels
+			if room_label_mode != 2:
+				if room_label_mode == 1: # ICONS ONLY
+					_draw_room_symbol(rtype, center_pt - Vector2(0, 6), 9.0, WIRE_BRIGHT if selected else WIRE_MID)
+					if z >= 0.5:
+						draw_string(ThemeDB.fallback_font, center_pt + Vector2(-12, 14), "#%d" % rid, HORIZONTAL_ALIGNMENT_CENTER, -1, 9, WIRE_DIM)
+				else: # FULL
+					_draw_room_symbol(rtype, center_pt - Vector2(22, 6), 7.0, WIRE_BRIGHT if selected else WIRE_MID)
+					if z >= 0.42:
+						var short_name := _room_label(room).substr(0, 12)
+						draw_string(ThemeDB.fallback_font, center_pt + Vector2(-10, -2), short_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, WIRE_BRIGHT)
+						draw_string(ThemeDB.fallback_font, center_pt + Vector2(-10, 10), "#%d · CAP %s" % [rid, room.get("capacity", "?")], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, WIRE_DIM)
+
+	# 7. Render 1,200 Residents in 3D Isometric Coordinates
+	_draw_isometric_people(z)
+
+func _draw_iso_interior(rtype: int, c: Vector2) -> void:
+	match rtype:
+		0: # Bunk beds
+			draw_line(c - Vector2(8, 0), c + Vector2(8, 0), WIRE_DIM, 1.5)
+			draw_line(c - Vector2(8, 8), c + Vector2(8, 8), WIRE_DARK, 1.0)
+		11: # School desks
+			draw_line(c - Vector2(10, 4), c + Vector2(10, 4), WIRE_MID, 1.2)
+			draw_line(c - Vector2(10, -4), c + Vector2(10, -4), WIRE_MID, 1.2)
+		16: # Bio-farm racks
+			draw_line(c - Vector2(12, 0), c + Vector2(12, 0), WIRE_BRIGHT, 1.5)
+			draw_line(c - Vector2(12, -8), c + Vector2(12, -8), WIRE_BRIGHT, 1.5)
+		7: # Mine tracks
+			draw_line(c - Vector2(12, -6), c + Vector2(12, 6), WIRE_MID, 1.2)
+			draw_line(c - Vector2(12, -10), c + Vector2(12, 2), WIRE_MID, 1.2)
+		_:
+			draw_rect(Rect2(c - Vector2(6, 4), Vector2(12, 8)), WIRE_DARK, false, 1.0)
+
+func _draw_isometric_people(z: float) -> void:
+	var dot_radius := clampf(1.8 * z, 1.6, 3.8)
+	var glow_radius := dot_radius * 2.2
+	var room_people_count: Dictionary = {}
+
+	for person in snapshot.get("people", []):
+		var pid := int(person.get("id", 0))
+		var rid := int(person.get("location_id", 0))
+		var chosen := selected_type == "person" and selected_id == str(pid)
+		var is_traveling: bool = str(person.get("activity", "")).to_lower().contains("travel")
+
+		var draw_pos: Vector2
+		if is_traveling:
+			var journey: Dictionary = person.get("journey", {})
+			var from_l: int = int(journey.get("from_level", 1))
+			var to_l: int = int(journey.get("to_level", 1))
+			var prog: float = float(person.get("travel_progress", 0.5))
+			var cur_l: float = lerpf(float(from_l - 1), float(to_l - 1), prog)
+			var a := cur_l * TAU - PI * 0.5
+			draw_pos = _iso_project(68.0 * 0.8, a, cur_l)
+		elif room_iso_rect_cache.has(rid):
+			var room_info: Dictionary = room_iso_rect_cache[rid]
+			var c_pt: Vector2 = room_info["center"]
+			var idx: int = room_people_count.get(rid, 0)
+			room_people_count[rid] = idx + 1
+			var col := idx % 6
+			var row := idx / 6
+			draw_pos = c_pt + Vector2(float(col - 2) * 5.5, float(row - 1) * 4.5)
+		else:
+			continue
+
+		person_draw_positions[pid] = draw_pos
+
+		var cur_radius: float = dot_radius * 1.35 if chosen else dot_radius
+		draw_circle(draw_pos, cur_radius + (3.0 if chosen else (glow_radius - dot_radius)), PERSON_GLOW)
+		draw_circle(draw_pos, cur_radius, PERSON_COLOR)
+
+		if chosen:
+			_draw_reticle(draw_pos, WIRE_BRIGHT, 12.0)
+			var dst_id := int(person.get("destination_id", 0))
+			if dst_id > 0 and room_iso_rect_cache.has(dst_id):
+				var dst_pos: Vector2 = room_iso_rect_cache[dst_id]["center"]
+				draw_dashed_line(draw_pos, dst_pos, UI_ACCENT, 1.5, 6.0)
+			if z >= 0.4:
+				var tag := "%s [%s]" % [person.get("name", "CITIZEN"), person.get("activity", "IDLE")]
+				draw_string(ThemeDB.fallback_font, draw_pos + Vector2(12, -8), tag, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_BORDER_BRIGHT)
 
 func _level_title(lid: int) -> String:
 	match lid:
@@ -677,12 +1139,141 @@ func _draw_rooms() -> void:
 		if z >= 0.35:
 			_draw_room_interior_wireframe(rtype, rect, back_rect)
 
-		# Room Header Labels
-		if z >= 0.30 or floor_plan_transition > 0.4:
-			var label := _room_label(room)
-			draw_string(ThemeDB.fallback_font, rect.position + Vector2(6, 17), label, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 10, 12, WIRE_BRIGHT)
-			if z >= 0.48 or floor_plan_transition > 0.7:
-				draw_string(ThemeDB.fallback_font, rect.position + Vector2(6, 33), "#%s · CAP %s" % [room.get("id", "?"), room.get("capacity", "—")], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 10, 10, WIRE_MID)
+		# Room Header Labels & Icons
+		if room_label_mode != 2: # 2 is OFF
+			var icon_color := WIRE_BRIGHT if selected else WIRE_MID
+			if room_label_mode == 1: # ICONS ONLY (Clean decluttered map)
+				if z >= 0.25 or floor_plan_transition > 0.3:
+					_draw_room_symbol(rtype, rect.position + Vector2(16, 16), 9.0, icon_color)
+					if z >= 0.45 or floor_plan_transition > 0.6:
+						draw_string(ThemeDB.fallback_font, rect.position + Vector2(28, 20), "#%s" % room.get("id", "?"), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, WIRE_MID)
+			else: # FULL (Text + Icon + Cap)
+				if z >= 0.28 or floor_plan_transition > 0.35:
+					_draw_room_symbol(rtype, rect.position + Vector2(14, 15), 7.0, icon_color)
+					var label := _room_label(room)
+					draw_string(ThemeDB.fallback_font, rect.position + Vector2(26, 17), label, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 30, 11, WIRE_BRIGHT)
+					if z >= 0.48 or floor_plan_transition > 0.7:
+						draw_string(ThemeDB.fallback_font, rect.position + Vector2(26, 32), "#%s · CAP %s" % [room.get("id", "?"), room.get("capacity", "—")], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 30, 10, WIRE_MID)
+
+func _draw_room_symbol(rtype: int, c: Vector2, r: float, col: Color) -> void:
+	match rtype:
+		0: # Residential Apartment: House silhouette
+			var pts: PackedVector2Array = [
+				c + Vector2(0, -r),
+				c + Vector2(r * 0.9, -r * 0.15),
+				c + Vector2(r * 0.9, r * 0.9),
+				c + Vector2(-r * 0.9, r * 0.9),
+				c + Vector2(-r * 0.9, -r * 0.15)
+			]
+			draw_polyline(pts, col, 1.5, true)
+			draw_line(c + Vector2(-r * 0.25, r * 0.9), c + Vector2(-r * 0.25, r * 0.35), col, 1.2)
+			draw_line(c + Vector2(-r * 0.25, r * 0.35), c + Vector2(r * 0.25, r * 0.35), col, 1.2)
+			draw_line(c + Vector2(r * 0.25, r * 0.35), c + Vector2(r * 0.25, r * 0.9), col, 1.2)
+		1: # Dormitory: Bunk bed
+			draw_line(c + Vector2(-r * 0.8, -r * 0.2), c + Vector2(r * 0.8, -r * 0.2), col, 1.8)
+			draw_line(c + Vector2(-r * 0.8, r * 0.5), c + Vector2(r * 0.8, r * 0.5), col, 1.8)
+			draw_line(c + Vector2(-r * 0.8, -r * 0.7), c + Vector2(-r * 0.8, r * 0.8), col, 1.5)
+			draw_line(c + Vector2(r * 0.8, -r * 0.7), c + Vector2(r * 0.8, r * 0.8), col, 1.5)
+			draw_line(c + Vector2(r * 0.3, -r * 0.2), c + Vector2(r * 0.3, r * 0.5), col, 1.2)
+		2, 3: # Canteen / Kitchen: Dining bowl with steam
+			var arc_pts: PackedVector2Array = []
+			for i in range(9):
+				var ang: float = float(i) * PI / 8.0
+				arc_pts.append(c + Vector2(cos(ang) * r * 0.8, sin(ang) * r * 0.5 + r * 0.15))
+			draw_polyline(arc_pts, col, 1.5)
+			draw_line(c + Vector2(-r * 0.8, r * 0.15), c + Vector2(r * 0.8, r * 0.15), col, 1.5)
+			draw_line(c + Vector2(-r * 0.3, -r * 0.05), c + Vector2(-r * 0.35, -r * 0.55), col, 1.2)
+			draw_line(c + Vector2(r * 0.3, -r * 0.05), c + Vector2(r * 0.35, -r * 0.55), col, 1.2)
+		4: # Hygiene: Shower spray
+			draw_line(c + Vector2(-r * 0.6, -r * 0.5), c + Vector2(0, -r * 0.7), col, 1.6)
+			draw_line(c + Vector2(-r * 0.3, -r * 0.3), c + Vector2(r * 0.3, -r * 0.7), col, 2.0)
+			draw_line(c + Vector2(-r * 0.3, 0), c + Vector2(-r * 0.5, r * 0.7), col, 1.2)
+			draw_line(c + Vector2(0, 0), c + Vector2(-r * 0.1, r * 0.75), col, 1.2)
+			draw_line(c + Vector2(r * 0.3, 0), c + Vector2(r * 0.3, r * 0.7), col, 1.2)
+		5: # Machine Shop: Gear
+			draw_arc(c, r * 0.5, 0, TAU, 12, col, 1.5)
+			for i in range(6):
+				var a := float(i) * TAU / 6.0
+				draw_line(c + Vector2(cos(a), sin(a)) * r * 0.45, c + Vector2(cos(a), sin(a)) * r * 0.85, col, 1.8)
+		6: # Foundry: Crucible
+			var f_pts: PackedVector2Array = [
+				c + Vector2(-r * 0.7, -r * 0.5), c + Vector2(r * 0.7, -r * 0.5),
+				c + Vector2(r * 0.45, r * 0.7), c + Vector2(-r * 0.45, r * 0.7)
+			]
+			draw_polyline(f_pts, col, 1.5, true)
+			draw_line(c + Vector2(-r * 0.9, -r * 0.5), c + Vector2(r * 0.9, -r * 0.5), col, 1.4)
+		7: # Deep Mine: Crossed pickaxes
+			draw_line(c + Vector2(-r * 0.7, r * 0.7), c + Vector2(r * 0.7, -r * 0.7), col, 1.5)
+			draw_line(c + Vector2(r * 0.7, r * 0.7), c + Vector2(-r * 0.7, -r * 0.7), col, 1.5)
+			draw_line(c + Vector2(r * 0.4, -r * 0.85), c + Vector2(r * 0.85, -r * 0.4), col, 2.2)
+			draw_line(c + Vector2(-r * 0.85, -r * 0.4), c + Vector2(-r * 0.4, -r * 0.85), col, 2.2)
+		8, 23: # Water Pump / Treatment: Teardrop & waves
+			draw_line(c + Vector2(0, -r * 0.8), c + Vector2(r * 0.5, r * 0.2), col, 1.5)
+			draw_line(c + Vector2(0, -r * 0.8), c + Vector2(-r * 0.5, r * 0.2), col, 1.5)
+			draw_arc(c + Vector2(0, r * 0.2), r * 0.5, 0, PI, 8, col, 1.5)
+			draw_line(c + Vector2(-r * 0.7, r * 0.75), c + Vector2(r * 0.7, r * 0.75), col, 1.2)
+		9: # Server Room: 3 Rack slots
+			draw_rect(Rect2(c - Vector2(r * 0.7, r * 0.6), Vector2(r * 1.4, r * 0.35)), col, false, 1.2)
+			draw_rect(Rect2(c - Vector2(r * 0.7, -r * 0.05), Vector2(r * 1.4, r * 0.35)), col, false, 1.2)
+			draw_circle(c + Vector2(-r * 0.4, -r * 0.42), 1.5, col)
+			draw_circle(c + Vector2(-r * 0.4, r * 0.12), 1.5, col)
+		10: # Clinic: Medical Cross
+			draw_line(c + Vector2(-r * 0.7, 0), c + Vector2(r * 0.7, 0), col, 2.6)
+			draw_line(c + Vector2(0, -r * 0.7), c + Vector2(0, r * 0.7), col, 2.6)
+		11: # School: Open book
+			var b_l: PackedVector2Array = [c + Vector2(0, r * 0.4), c + Vector2(-r * 0.8, r * 0.25), c + Vector2(-r * 0.8, -r * 0.45), c + Vector2(0, -r * 0.3)]
+			var b_r: PackedVector2Array = [c + Vector2(0, r * 0.4), c + Vector2(r * 0.8, r * 0.25), c + Vector2(r * 0.8, -r * 0.45), c + Vector2(0, -r * 0.3)]
+			draw_polyline(b_l, col, 1.4, true)
+			draw_polyline(b_r, col, 1.4, true)
+			draw_line(c + Vector2(0, -r * 0.3), c + Vector2(0, r * 0.4), col, 1.8)
+		12: # Admin: Pillar facade
+			draw_line(c + Vector2(-r * 0.8, -r * 0.4), c + Vector2(0, -r * 0.8), col, 1.5)
+			draw_line(c + Vector2(0, -r * 0.8), c + Vector2(r * 0.8, -r * 0.4), col, 1.5)
+			draw_line(c + Vector2(-r * 0.8, -r * 0.4), c + Vector2(r * 0.8, -r * 0.4), col, 1.5)
+			draw_line(c + Vector2(-r * 0.5, -r * 0.4), c + Vector2(-r * 0.5, r * 0.6), col, 1.4)
+			draw_line(c + Vector2(0, -r * 0.4), c + Vector2(0, r * 0.6), col, 1.4)
+			draw_line(c + Vector2(r * 0.5, -r * 0.4), c + Vector2(r * 0.5, r * 0.6), col, 1.4)
+			draw_line(c + Vector2(-r * 0.8, r * 0.6), c + Vector2(r * 0.8, r * 0.6), col, 1.5)
+		13: # Recreation: Diamond star
+			var d_pts: PackedVector2Array = [c + Vector2(0, -r * 0.8), c + Vector2(r * 0.7, 0), c + Vector2(0, r * 0.8), c + Vector2(-r * 0.7, 0)]
+			draw_polyline(d_pts, col, 1.5, true)
+		14: # Storage: Crate with X brace
+			draw_rect(Rect2(c - Vector2(r * 0.6, r * 0.6), Vector2(r * 1.2, r * 1.2)), col, false, 1.5)
+			draw_line(c - Vector2(r * 0.5, r * 0.5), c + Vector2(r * 0.5, r * 0.5), col, 1.0)
+			draw_line(c + Vector2(-r * 0.5, r * 0.5), c + Vector2(r * 0.5, -r * 0.5), col, 1.0)
+		15: # Security: Shield
+			var s_pts: PackedVector2Array = [
+				c + Vector2(-r * 0.7, -r * 0.7), c + Vector2(r * 0.7, -r * 0.7),
+				c + Vector2(r * 0.6, r * 0.1), c + Vector2(0, r * 0.8), c + Vector2(-r * 0.6, r * 0.1)
+			]
+			draw_polyline(s_pts, col, 1.6, true)
+		16: # Bio-Farm: Seedling Sprout
+			draw_line(c + Vector2(0, r * 0.75), c + Vector2(0, -r * 0.25), col, 1.8)
+			draw_line(c + Vector2(0, 0), c + Vector2(-r * 0.55, -r * 0.35), col, 1.5)
+			draw_line(c + Vector2(-r * 0.55, -r * 0.35), c + Vector2(0, -r * 0.25), col, 1.5)
+			draw_line(c + Vector2(0, -r * 0.1), c + Vector2(r * 0.55, -r * 0.45), col, 1.5)
+			draw_line(c + Vector2(r * 0.55, -r * 0.45), c + Vector2(0, -r * 0.25), col, 1.5)
+		18: # Waste Processing: Recycling arrows
+			var t1 := c + Vector2(0, -r * 0.75)
+			var t2 := c + Vector2(r * 0.7, r * 0.55)
+			var t3 := c + Vector2(-r * 0.7, r * 0.55)
+			draw_line(t1, t2, col, 1.5); draw_line(t2, t3, col, 1.5); draw_line(t3, t1, col, 1.5)
+			draw_line(t1, t1 + Vector2(r * 0.2, r * 0.1), col, 1.4)
+			draw_line(t2, t2 + Vector2(-r * 0.1, -r * 0.2), col, 1.4)
+		19: # Air Handler: Ventilation Fan
+			draw_arc(c, r * 0.7, 0, TAU, 12, col, 1.2)
+			for i in range(4):
+				var a := float(i) * PI * 0.5 + 0.25
+				draw_line(c, c + Vector2(cos(a), sin(a)) * r * 0.65, col, 1.8)
+		20: # Power Plant: Lightning bolt
+			var bolt: PackedVector2Array = [
+				c + Vector2(r * 0.2, -r * 0.75), c + Vector2(-r * 0.3, 0),
+				c + Vector2(r * 0.1, 0), c + Vector2(-r * 0.2, r * 0.75),
+				c + Vector2(r * 0.35, -r * 0.1), c + Vector2(0, -r * 0.1)
+			]
+			draw_polyline(bolt, col, 1.6, true)
+		_: # Generic Room
+			draw_rect(Rect2(c - Vector2(r * 0.5, r * 0.5), Vector2(r, r)), col, false, 1.4)
 
 func _room_tint(rtype: int) -> Color:
 	match rtype:
@@ -950,6 +1541,21 @@ func _zoom(factor: float, screen: Vector2) -> void:
 	var after := get_canvas_transform().affine_inverse() * screen; camera.position += before - after
 
 func _pick(point: Vector2) -> void:
+	if view_mode == VIEW_ISOMETRIC:
+		var nearest_person := 0; var nearest_distance := 14.0
+		for pid in person_draw_positions:
+			var distance := (person_draw_positions[pid] as Vector2).distance_to(point)
+			if distance < nearest_distance: nearest_distance = distance; nearest_person = int(pid)
+		if nearest_person > 0:
+			_select("person", str(nearest_person), int(people_by_id[nearest_person].get("location_id", 0))); return
+
+		for rid in room_iso_rect_cache:
+			var info: Dictionary = room_iso_rect_cache[rid]
+			var poly: PackedVector2Array = info.get("poly", [])
+			if Geometry2D.is_point_in_polygon(point, poly):
+				_select("room", str(rid), rid); return
+		return
+
 	if camera.zoom.x >= 0.45 or floor_plan_transition > 0.4:
 		for mid in machine_draw_positions:
 			if (machine_draw_positions[mid] as Vector2).distance_to(point) <= 12.0:
@@ -1185,6 +1791,11 @@ func _search_selected(index: int) -> void:
 func _focus_room(room_id: int, zoom_target := 1.0) -> void:
 	if not room_by_id.has(room_id): return
 	var room: Dictionary = room_by_id[room_id]
+	if view_mode == VIEW_ISOMETRIC:
+		if room_iso_rect_cache.has(room_id):
+			camera.position = room_iso_rect_cache[room_id]["center"]
+			camera.zoom = Vector2.ONE * zoom_target
+		return
 	if isolated_level != null:
 		_apply_isolated_level(int(room.get("level", 1)))
 	camera.position = _current_room_rect(room).get_center()
@@ -1194,6 +1805,11 @@ func _focus_person(id: int, select := true) -> void:
 	if not people_by_id.has(id): return
 	var person: Dictionary = people_by_id[id]; var rid := int(person.get("location_id", 0))
 	if select: _select("person", str(id), rid)
+	if view_mode == VIEW_ISOMETRIC:
+		if person_draw_positions.has(id):
+			camera.position = person_draw_positions[id]
+			camera.zoom = Vector2.ONE * 0.8
+		return
 	var pos: Vector2 = _journey_position(person, _current_room_rect(room_by_id[rid]).get_center()) if room_by_id.has(rid) else Vector2(person_draw_positions.get(id, camera.position))
 	camera.position = pos
 	if not person.get("journey", {}).is_empty(): isolated_level = null
@@ -1209,7 +1825,10 @@ func _level_selected(index: int) -> void:
 
 func _apply_isolated_level(lid: int) -> void:
 	isolated_level = lid
-	isolate_button.text = "SHOW ALL [I]"
+	view_mode = VIEW_FLOOR_PLAN
+	floor_plan_transition = 1.0
+	if view_button: view_button.text = "VIEW: FLOOR PLAN [V]"
+	if isolate_button: isolate_button.text = "SHOW ALL [I]"
 	var cy := _level_center_y(lid)
 	camera.position = Vector2(192.0 / 0.85, cy)
 	camera.zoom = Vector2.ONE * 0.85
@@ -1219,7 +1838,10 @@ func _apply_isolated_level(lid: int) -> void:
 func _toggle_isolate() -> void:
 	if isolated_level != null:
 		isolated_level = null
-		isolate_button.text = "ISOLATE [I]"
+		floor_plan_transition = 0.0
+		view_mode = VIEW_CUTAWAY
+		if view_button: view_button.text = "VIEW: CUTAWAY [V]"
+		if isolate_button: isolate_button.text = "ISOLATE [I]"
 		_fit_whole()
 	elif selected_room_id > 0 and room_by_id.has(selected_room_id):
 		_apply_isolated_level(int(room_by_id[selected_room_id].get("level", 1)))
@@ -1229,8 +1851,10 @@ func _toggle_isolate() -> void:
 	queue_redraw()
 
 func _fit_whole() -> void:
-	isolated_level = null; follow_person_id = 0
-	if isolate_button: isolate_button.text = "ISOLATE [I]"
+	if view_mode != VIEW_FLOOR_PLAN:
+		isolated_level = null
+	follow_person_id = 0
+	if isolate_button: isolate_button.text = "ISOLATE [I]" if isolated_level == null else "SHOW ALL [I]"
 	var rect := _whole_silo_rect().grow(30.0)
 	var viewport := get_viewport_rect().size - Vector2(400, 75)
 	var z := clampf(minf(viewport.x / maxf(1.0, rect.size.x), viewport.y / maxf(1.0, rect.size.y)), 0.05, 1.2)
@@ -1244,6 +1868,8 @@ func _bounds_rect() -> Rect2:
 	return Rect2(float(b.get("x", 0)), float(b.get("y", 0)), maxf(1, float(b.get("width", 1000))), maxf(1, float(b.get("height", 1000))))
 
 func _whole_silo_rect() -> Rect2:
+	if view_mode == VIEW_ISOMETRIC:
+		return Rect2(-650, -150, 1300, 2600)
 	var b := _bounds_rect()
 	return Rect2(b.position.x - 270.0, -260.0, b.size.x + 360.0, b.size.y + 530.0)
 
@@ -1274,6 +1900,9 @@ func _room_rect_topdown(room: Dictionary) -> Rect2:
 	for r in geometry.get("rooms", []):
 		if int(r.get("level", 0)) == lid: level_rooms.append(r)
 
+	level_rooms.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("id", 0)) < int(b.get("id", 0)))
+
 	var special_rooms: Array = []
 	var res_rooms: Array = []
 	for r in level_rooms:
@@ -1283,28 +1912,57 @@ func _room_rect_topdown(room: Dictionary) -> Rect2:
 		else:
 			special_rooms.append(r)
 
-	# 1. Special & Industrial Facilities: Arranged around the inner corridor ring (Radius 135-175)
+	# 1. Special & Industrial Facilities: Placed in the four quadrant bays (between cardinal avenues)
+	# connected to the diagonal secondary corridors and central ring
 	var s_idx := special_rooms.find(room)
 	if s_idx >= 0:
 		var total_s := maxi(1, special_rooms.size())
-		var angle := float(s_idx) * (TAU / float(total_s)) - (PI * 0.5)
-		var rad := 145.0
+		var quad_angles := [ -PI * 0.25, -PI * 0.75, PI * 0.75, PI * 0.25 ]
+		var angle: float = quad_angles[s_idx % 4]
+		if total_s > 4:
+			angle += (float(s_idx / 4) * 0.22)
+		var rad: float = 210.0 if total_s <= 4 else (165.0 + float(s_idx / 4) * 85.0)
 		var r_pos := center + Vector2(cos(angle), sin(angle)) * rad
-		var rw: float = float(room.get("width", 260.0)) * 0.65
-		var rh: float = float(room.get("height", 88.0)) * 0.75
+		var rw: float = clampf(float(room.get("width", 240.0)) * 0.65, 120.0, 220.0)
+		var rh: float = clampf(float(room.get("height", 88.0)) * 0.85, 70.0, 95.0)
 		var rect := Rect2(r_pos - Vector2(rw * 0.5, rh * 0.5), Vector2(rw, rh))
 		topdown_rect_cache[rid] = rect
 		return rect
 
-	# 2. Residential Rooms: Arranged along outer radial sectors (Radius 245-340)
+	# 2. Residential Rooms: Flanking the 4 Cardinal Avenue Corridors in neat architectural blocks
 	var r_idx := res_rooms.find(room)
-	var total_r := maxi(1, res_rooms.size())
-	var angle_r := float(r_idx) * (TAU / float(total_r)) - (PI * 0.5) + (PI / float(total_r))
-	var rad_r := 250.0 + float(r_idx % 2) * 65.0
-	var r_pos_res := center + Vector2(cos(angle_r), sin(angle_r)) * rad_r
-	var rw_res: float = float(room.get("width", 120.0)) * 0.75
-	var rh_res: float = float(room.get("height", 88.0)) * 0.75
-	var res_rect := Rect2(r_pos_res - Vector2(rw_res * 0.5, rh_res * 0.5), Vector2(rw_res, rh_res))
+	# 4 Cardinal Avenues: 0=North, 1=East, 2=South, 3=West
+	var avenue_idx: int = r_idx % 4
+	var avenue_slot: int = r_idx / 4 # slot along the avenue
+	var side_sign: float = -1.0 if (avenue_slot % 2 == 0) else 1.0 # alternate left/right flank
+	var depth_step: int = avenue_slot / 2 # 0, 1, 2, 3, 4 along corridor
+	var dist_along: float = 135.0 + float(depth_step) * 52.0
+
+	var rw_res: float = 64.0
+	var rh_res: float = 46.0
+	var rect_pos := center
+
+	match avenue_idx:
+		0: # North Avenue (Corridor X in [-16, 16], Y negative)
+			var rx := center.x + (side_sign * (16.0 + rw_res * 0.5))
+			var ry := center.y - dist_along
+			rect_pos = Vector2(rx, ry)
+		1: # East Avenue (Corridor Y in [-16, 16], X positive)
+			var rx := center.x + dist_along
+			var ry := center.y + (side_sign * (16.0 + rh_res * 0.5))
+			rect_pos = Vector2(rx, ry)
+			var swap := rw_res; rw_res = rh_res; rh_res = swap
+		2: # South Avenue (Corridor X in [-16, 16], Y positive)
+			var rx := center.x + (side_sign * (16.0 + rw_res * 0.5))
+			var ry := center.y + dist_along
+			rect_pos = Vector2(rx, ry)
+		3: # West Avenue (Corridor Y in [-16, 16], X negative)
+			var rx := center.x - dist_along
+			var ry := center.y + (side_sign * (16.0 + rh_res * 0.5))
+			rect_pos = Vector2(rx, ry)
+			var swap := rw_res; rw_res = rh_res; rh_res = swap
+
+	var res_rect := Rect2(rect_pos - Vector2(rw_res * 0.5, rh_res * 0.5), Vector2(rw_res, rh_res))
 	topdown_rect_cache[rid] = res_rect
 	return res_rect
 

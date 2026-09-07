@@ -56,8 +56,17 @@ static func get_updates(ws: WorldState, since_tick: int, reset_revision: int = 0
 	if include_checksum:
 		clock = SimulationReader.get_clock_summary(ws)
 		clock["checksum"] = str(clock["checksum"])
+		clock["time"] = "%02d:%02d" % [clock.get("hour", 0), clock.get("minute", 0)]
 	else:
-		clock = {"tick": current_tick, "formatted_time": ws.sim_clock.get_formatted_time()} 
+		clock = {
+			"tick": current_tick,
+			"year": ws.sim_clock.get_year(),
+			"day_of_year": ws.sim_clock.get_day_of_year(),
+			"hour": ws.sim_clock.get_hour_of_day(),
+			"minute": ws.sim_clock.get_minute_of_hour(),
+			"formatted_time": ws.sim_clock.get_formatted_time(),
+			"time": "%02d:%02d" % [ws.sim_clock.get_hour_of_day(), ws.sim_clock.get_minute_of_hour()]
+		} 
 	return {
 		"reset_revision": reset_revision, "revision": current_tick,
 		"clock": clock, "people": people, "removed_person_ids": [],
