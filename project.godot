@@ -10,6 +10,21 @@ config/name="SILO"
 config/description="Deep deterministic simulation of a long-lived underground human civilisation."
 config/version="0.1.0"
 config/features=PackedStringArray("4.4", "Forward Plus")
+run/main_scene="res://src/game/physical_world.tscn"
+
+[display]
+
+window/size/viewport_width=1440
+window/size/viewport_height=900
+window/size/window_width_override=1440
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.012, 0.016, 0.023, 1)
 
 [debug]
 

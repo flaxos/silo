@@ -267,6 +267,9 @@ static func get_room_summary(ws: WorldState, room_id: int) -> Dictionary:
 		Room.TYPE_CLINIC: type_name = "CLINIC"
 		Room.TYPE_SCHOOL: type_name = "SCHOOL"
 		
+	if type_name == "UNKNOWN":
+		type_name = SiloLayoutConfig.get_room_type_name(r.room_type).to_upper().replace(" ", "_")
+
 	var occupants: Array[Dictionary] = []
 	var pids: Array[int] = registry.get_entities_by_type("person")
 	for pid in pids:

@@ -25,6 +25,7 @@ const TYPE_AIR_HANDLER: int = 19
 const TYPE_POWER_PLANT: int = 20
 const TYPE_STAIRCASE: int = 21
 const TYPE_CORRIDOR: int = 22
+const TYPE_WASTEWATER_TREATMENT: int = 23
 
 var id: int = 0
 var sector_id: int = 1

@@ -92,23 +92,49 @@ static func _create_functional_rooms(world_state: WorldState) -> Dictionary:
 	var registry: EntityRegistry = world_state.entity_registry
 	var rooms_created: Dictionary = {}
 	
-	# Define core standard functional rooms
+	# Functional rooms are deliberately interleaved with housing across the full
+	# height. Utility/agriculture rooms without simulation systems are physical
+	# hooks only: creating them does not invent production or resource state.
 	var specs: Array[Dictionary] = [
 		{"type": Room.TYPE_CANTEEN, "sector": 1, "level": 3, "cap": 50},
-		{"type": Room.TYPE_CANTEEN, "sector": 2, "level": 3, "cap": 50},
-		{"type": Room.TYPE_CANTEEN, "sector": 3, "level": 3, "cap": 50},
-		{"type": Room.TYPE_CANTEEN, "sector": 4, "level": 3, "cap": 50},
+		{"type": Room.TYPE_CANTEEN, "sector": 2, "level": 8, "cap": 50},
+		{"type": Room.TYPE_CANTEEN, "sector": 3, "level": 13, "cap": 50},
+		{"type": Room.TYPE_CANTEEN, "sector": 4, "level": 18, "cap": 50},
 		{"type": Room.TYPE_SCHOOL, "sector": 1, "level": 2, "cap": 40},
-		{"type": Room.TYPE_SCHOOL, "sector": 2, "level": 2, "cap": 40},
+		{"type": Room.TYPE_SCHOOL, "sector": 2, "level": 9, "cap": 40},
+		{"type": Room.TYPE_SCHOOL, "sector": 4, "level": 16, "cap": 40},
 		{"type": Room.TYPE_CLINIC, "sector": 1, "level": 4, "cap": 20},
+		{"type": Room.TYPE_CLINIC, "sector": 3, "level": 11, "cap": 20},
+		{"type": Room.TYPE_CLINIC, "sector": 4, "level": 17, "cap": 20},
 		{"type": Room.TYPE_KITCHEN, "sector": 1, "level": 3, "cap": 20},
 		{"type": Room.TYPE_HYGIENE_FACILITY, "sector": 1, "level": 1, "cap": 30},
+		{"type": Room.TYPE_HYGIENE_FACILITY, "sector": 2, "level": 8, "cap": 30},
+		{"type": Room.TYPE_HYGIENE_FACILITY, "sector": 4, "level": 16, "cap": 30},
+		{"type": Room.TYPE_RECREATION, "sector": 1, "level": 5, "cap": 40},
+		{"type": Room.TYPE_RECREATION, "sector": 3, "level": 12, "cap": 40},
+		{"type": Room.TYPE_STORAGE, "sector": 2, "level": 6, "cap": 20},
+		{"type": Room.TYPE_STORAGE, "sector": 4, "level": 14, "cap": 20},
+		{"type": Room.TYPE_BIO_FARM, "sector": 2, "level": 5, "cap": 30},
+		{"type": Room.TYPE_BIO_FARM, "sector": 3, "level": 10, "cap": 30},
+		{"type": Room.TYPE_BIO_FARM, "sector": 4, "level": 15, "cap": 30},
 		{"type": Room.TYPE_SERVER_ROOM, "sector": 1, "level": 5, "cap": 15},
+		{"type": Room.TYPE_SECURITY_POST, "sector": 1, "level": 7, "cap": 15},
+		{"type": Room.TYPE_AIR_HANDLER, "sector": 2, "level": 7, "cap": 15},
+		{"type": Room.TYPE_POWER_PLANT, "sector": 3, "level": 12, "cap": 25},
+		{"type": Room.TYPE_WASTE_PROCESSING, "sector": 4, "level": 17, "cap": 25},
+		{"type": Room.TYPE_WASTEWATER_TREATMENT, "sector": 4, "level": 19, "cap": 20},
+		{"type": Room.TYPE_FOOD_PROCESSING, "sector": 3, "level": 10, "cap": 25},
 		{"type": Room.TYPE_MACHINE_SHOP, "sector": 3, "level": 6, "cap": 40},
 		{"type": Room.TYPE_FOUNDRY, "sector": 3, "level": 10, "cap": 30},
 		{"type": Room.TYPE_DEEP_MINE, "sector": 4, "level": 15, "cap": 60},
 		{"type": Room.TYPE_WATER_PUMP_STATION, "sector": 4, "level": 18, "cap": 20},
 	]
+	# A small local canteen on every otherwise-unserved level keeps meals local;
+	# the four larger canteens above remain neighbourhood hubs.
+	var canteen_levels: Dictionary = {3: true, 8: true, 13: true, 18: true}
+	for level in range(1, 21):
+		if not canteen_levels.has(level):
+			specs.append({"type": Room.TYPE_CANTEEN, "sector": ((level - 1) % 4) + 1, "level": level, "cap": 24})
 	
 	for spec in specs:
 		var r: Room = Room.new(0, spec["type"], 0, spec["sector"], spec["level"])
@@ -135,7 +161,9 @@ static func _get_closest_facility(world_state: WorldState, home_room_id: int, ta
 		if r and r.room_type == target_room_type:
 			if not home_room:
 				return rid
-			var dist: int = abs(home_room.sector_id - r.sector_id) * 10 + abs(home_room.level - r.level)
+			# Vertical distance must influence daily life strongly enough that a local
+			# service on a neighbouring level beats a same-sector facility far away.
+			var dist: int = abs(home_room.sector_id - r.sector_id) * 2 + abs(home_room.level - r.level)
 			if dist < min_distance:
 				min_distance = dist
 				best_room_id = rid

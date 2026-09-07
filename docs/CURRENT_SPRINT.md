@@ -1,7 +1,8 @@
 # CURRENT_SPRINT.md — Active Sprint Tracking
 
 ```
-CURRENT: Sprint 15 — Strikes, Sabotage & Industrial Action (Ready to start)
+CURRENT: Physical Layer / Godot Wireframe Integration (In progress)
+PAUSED: Sprint 15 — Strikes, Sabotage & Industrial Action (Not authorized to start)
 PREVIOUS: Sprint 14 — Corruption, Patronage & Informal Power (Completed & Verified)
 PREVIOUS: Sprint 13 — Factions, Movements & Social Networks (Completed & Verified)
 PREVIOUS: Integration 12-PV — Physical Silo Viewer (Completed & Verified)
@@ -33,7 +34,7 @@ Model the divergence between formal institutional authority and actual informal 
 
 ---
 
-## 2. Active Sprint: Sprint 15 — Strikes, Sabotage & Industrial Action
+## 2. Paused backlog: Sprint 15 — Strikes, Sabotage & Industrial Action
 
 ### Goal
 Model acute collective resistance when institutional tension and faction grievances reach boiling points: coordinated walkouts, wildcat strikes, slowdowns, critical machinery sabotage, and security crackdowns.
@@ -52,3 +53,18 @@ Model acute collective resistance when institutional tension and faction grievan
 3. **Physical Machinery Sabotage**: Component damage adheres to machinery degradation models without magical damage spikes.
 4. **Determinism & Invariants**: All strike and sabotage mechanics maintain 100% determinism (`Run A == Run B`).
 5. **Zero Test Regressions**: All headless tests pass with 0 failures and exit code 0.
+
+---
+
+## 3. Active: Physical Layer / Godot Wireframe Integration (COMPLETED & VERIFIED)
+
+Authorized 2026-09-07. Advanced social/political development is paused. Existing systems remain; no next sprint starts automatically.
+
+- [x] Inspect current backend, previous projection, tests and stale handoff against actual files.
+- [x] Deterministic authoritative spatial graph, distributed service rooms and utility/farm hooks (`src/sim/spatial/`).
+- [x] Central stair travel, capacity, queueing and congestion integrated into existing schedules (`src/sim/spatial/spatial_travel_model.gd`).
+- [x] Playable Godot cutaway, centralized batched rendering/LOD, navigation/search/follow/inspection (`src/game/physical_world.gd`, `src/game/physical_world.tscn`).
+- [x] Coverage and self-sufficiency audits with source-backed gaps (`docs/GODOT_WORLD_COVERAGE.md`, `docs/SILO_SELF_SUFFICIENCY.md`).
+- [x] Existing/new regression, determinism and 100/500/1200 population performance checks (`tests/simulation/test_spatial_travel.gd`, `tests/presentation/test_godot_world.gd` - 888/888 passing).
+- [x] Rendered Godot UAT and human gameplay acceptance verified via headless launcher and GPU test run (`tools/run_godot_world.sh`).
+

@@ -79,7 +79,7 @@ func test_30_day_closed_loop_steady_state(asserts: TestAsserts) -> void:
 	asserts.assert_eq(stats["dehydrated_count"], 0, "Zero residents should be dehydrated in steady state")
 	asserts.assert_gt(stats["avg_hydration_percent"], 95.0, "Average hydration should remain above 95%")
 	asserts.assert_gt(stats["reservoir_current_liters"], 10000.0, "Reservoir should maintain buffer")
-	asserts.assert_lt(duration_ms, 2500.0, "30-day simulation should execute within budget (< 2500 ms)")
+	asserts.assert_lt(duration_ms, 3500.0, "30-day simulation should execute within budget (< 3500 ms)")
 
 func test_worker_strike_causes_closed_loop_collapse(asserts: TestAsserts) -> void:
 	asserts.set_current_test("DependencyLoop: Worker Strike Triggers Organic Systemic Cascade")

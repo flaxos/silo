@@ -42,7 +42,7 @@ static func get_snapshot(ws: WorldState, reset_revision: int = 0) -> Dictionary:
 		"dependency_links": _dependency_links(ws), "unresolved_links": warnings
 	}
 
-static func get_updates(ws: WorldState, since_tick: int, reset_revision: int = 0) -> Dictionary:
+static func get_updates(ws: WorldState, since_tick: int, reset_revision: int = 0, include_checksum: bool = true) -> Dictionary:
 	var current_tick: int = ws.sim_clock.get_tick()
 	var people: Array[Dictionary] = []
 	var ids: Array[int] = ws.entity_registry.get_entities_by_type("person").duplicate()
@@ -52,25 +52,33 @@ static func get_updates(ws: WorldState, since_tick: int, reset_revision: int = 0
 		for pid in ids:
 			var p: Person = ws.entity_registry.get_entity(pid) as Person
 			if p: people.append(_person_live(ws, p))
-	var clock: Dictionary = SimulationReader.get_clock_summary(ws)
-	clock["checksum"] = str(clock["checksum"])
+	var clock: Dictionary
+	if include_checksum:
+		clock = SimulationReader.get_clock_summary(ws)
+		clock["checksum"] = str(clock["checksum"])
+	else:
+		clock = {"tick": current_tick, "formatted_time": ws.sim_clock.get_formatted_time()} 
 	return {
 		"reset_revision": reset_revision, "revision": current_tick,
 		"clock": clock, "people": people, "removed_person_ids": [],
 		"machines": SimulationReader.get_machinery_summary(ws)["machines_list"] if since_tick < current_tick else [],
-		"incidents": SimulationReader.get_incidents_summary(ws),
+		"incidents": get_incident_locations(ws),
 		"utilities": SimulationReader.get_utilities_summary(ws),
-		"institutions": SimulationReader.get_institutions_summary(ws)
+		"institutions": SimulationReader.get_institutions_summary(ws),
+		"stairs": get_stairs(ws)
 	}
 
 static func resolve_entity(ws: WorldState, type: String, id_text: String) -> Dictionary:
 	var id: int = id_text.to_int()
 	var details: Dictionary = {}
 	match type:
-		"person": details = SimulationReader.get_person_profile(ws, id)
+		"stair":
+			for stair in get_stairs(ws):
+				if str(stair["id"]) == id_text: details = stair
+		"person": details = get_person_details(ws, id)
 		"household": details = SimulationReader.get_household_summary(ws, id)
-		"room": details = SimulationReader.get_room_summary(ws, id)
-		"machine": details = SimulationReader.get_causal_chain(ws, id)
+		"room": details = get_room_details(ws, id)
+		"machine": details = get_machine_details(ws, id)
 		"incident": details = _find_by_id(SimulationReader.get_incidents_summary(ws).get("active_incidents", []), id)
 		"resource": details = {"id": id_text, "economy": SimulationReader.get_economy_summary(ws)}
 	if details.is_empty(): return {}
@@ -111,13 +119,17 @@ static func _person_identity(ws: WorldState, p: Person) -> Dictionary:
 	return d
 
 static func _person_live(ws: WorldState, p: Person) -> Dictionary:
-	var total: int = 0
-	if p.current_activity == Person.ACTIVITY_TRAVELING:
+	var travel_state: Dictionary = ws.custom_data.get("spatial_travel", {})
+	var journeys: Dictionary = travel_state.get("journeys", {})
+	var journey: Dictionary = journeys.get(str(p.id), {})
+	var total: int = int(journey.get("base_travel_ticks", 0))
+	if total == 0 and p.current_activity == Person.ACTIVITY_TRAVELING:
 		total = _travel_ticks(ws, p.current_location_id, p.target_location_id)
 	return {"id": p.id, "location_id": p.current_location_id, "destination_id": p.target_location_id,
-		"activity": p.get_activity_name(), "is_alive": p.is_alive, "health": p.health_percent,
+		"activity": p.get_activity_name().to_upper(), "is_alive": p.is_alive, "health": p.health_percent,
 		"hydration": p.hydration_percent, "travel_ticks_remaining": p.travel_ticks_remaining,
-		"travel_ticks_total": total, "travel_progress": clampf(1.0 - float(p.travel_ticks_remaining) / float(maxi(1, total)), 0.0, 1.0)}
+		"travel_ticks_total": total, "travel_progress": clampf(1.0 - float(p.travel_ticks_remaining) / float(maxi(1, total)), 0.0, 1.0),
+		"journey": journey.duplicate(true)}
 
 static func _travel_ticks(ws: WorldState, from_id: int, to_id: int) -> int:
 	if from_id == to_id or from_id <= 0 or to_id <= 0: return 0
@@ -154,10 +166,113 @@ static func _resolve_room_id(ws: WorldState, type: String, id: int, details: Dic
 	if type == "incident":
 		var root_id: int = int(details.get("root_cause_id", 0))
 		var root: Variant = ws.entity_registry.get_entity(root_id)
-		return root.room_id if root is Machine else 0
+		if root is Machine: return root.room_id
+		if root is Room: return root.id
+		if root is Person: return root.current_location_id
+		if root is Inventory:
+			var owner: Variant = ws.entity_registry.get_entity(root.owner_entity_id)
+			if owner is Room: return owner.id
+		return 0
 	return 0
 
 static func _find_by_id(items: Array, id: int) -> Dictionary:
 	for item in items:
 		if int(item.get("id", 0)) == id: return item
 	return {}
+
+## Rich inspection is queried only for the selection, never per citizen/frame.
+static func get_person_details(ws: WorldState, id: int) -> Dictionary:
+	var p: Person = ws.entity_registry.get_entity(id) as Person
+	if not p: return {}
+	var details: Dictionary = SimulationReader.get_person_profile(ws, id)
+	details.merge(_person_identity(ws, p), true)
+	details["destination_id"] = p.target_location_id
+	details["bed_id"] = p.bed_id
+	details["household"] = SimulationReader.get_household_summary(ws, p.household_id)
+	details["workplace_required"] = p.shift_id != Occupation.SHIFT_OFF and p.occupation_id != "student"
+	return details
+
+static func get_room_details(ws: WorldState, id: int) -> Dictionary:
+	var r: Room = ws.entity_registry.get_entity(id) as Room
+	if not r: return {}
+	var details: Dictionary = SimulationReader.get_room_summary(ws, id)
+	details["backend_binding"] = room_backend_binding(r.room_type)
+	var workers: Array[Dictionary] = []
+	var students: Array[Dictionary] = []
+	var households: Array[Dictionary] = []
+	var shifts: Dictionary = {}
+	for pid in ws.entity_registry.get_entities_by_type("person"):
+		var p: Person = ws.entity_registry.get_entity(pid) as Person
+		if not p or not p.is_alive: continue
+		if p.workplace_room_id == id:
+			workers.append({"id": p.id, "name": p.get_full_name(), "department": p.department_id,
+				"job": p.occupation_id, "shift": Occupation.get_shift_name(p.shift_id),
+				"present": p.current_location_id == id and p.current_activity == Person.ACTIVITY_WORKING})
+			var shift: String = Occupation.get_shift_name(p.shift_id)
+			shifts[shift] = int(shifts.get(shift, 0)) + 1
+		if p.school_room_id == id:
+			students.append({"id": p.id, "name": p.get_full_name(), "household_id": p.household_id,
+				"present": p.current_location_id == id and p.current_activity == Person.ACTIVITY_STUDYING})
+	for hid in ws.entity_registry.get_entities_by_type("household"):
+		var h: Household = ws.entity_registry.get_entity(hid) as Household
+		if h and h.home_room_id == id: households.append(SimulationReader.get_household_summary(ws, hid))
+	details["workers"] = workers
+	details["students"] = students
+	details["households"] = households
+	details["shifts"] = shifts
+	details["machines"] = []
+	for m in SimulationReader.get_machinery_summary(ws)["machines_list"]:
+		if int(m["room_id"]) == id: details["machines"].append(m)
+	return details
+
+static func get_machine_details(ws: WorldState, id: int) -> Dictionary:
+	var m: Machine = ws.entity_registry.get_entity(id) as Machine
+	if not m: return {}
+	var details: Dictionary = SimulationReader.get_causal_chain(ws, id)
+	details["record"] = m.serialize().duplicate(true)
+	details["operator"] = "No individual operator assignment exists in backend"
+	details["maintenance_workers"] = []
+	for pid in ws.entity_registry.get_entities_by_type("person"):
+		var p: Person = ws.entity_registry.get_entity(pid) as Person
+		if p and p.is_alive and p.workplace_room_id == m.room_id and p.occupation_id == "maintenance_technician":
+			details["maintenance_workers"].append({"id": p.id, "name": p.get_full_name(),
+				"present": p.current_location_id == m.room_id and p.current_activity == Person.ACTIVITY_WORKING})
+	return details
+
+static func room_backend_binding(room_type: int) -> String:
+	match room_type:
+		Room.TYPE_RESIDENTIAL_APARTMENT, Room.TYPE_DORMITORY: return "Live household, bed and resident occupancy"
+		Room.TYPE_DEEP_MINE, Room.TYPE_FOUNDRY, Room.TYPE_MACHINE_SHOP: return "Live worker-dependent material production and room inventory; transfers are abstract"
+		Room.TYPE_WATER_PUMP_STATION: return "Live pump, component maintenance and water supply; treatment chemistry is not implemented"
+		Room.TYPE_SCHOOL: return "Live student/teacher assignments and attendance; education progression belongs to demographics"
+		Room.TYPE_CLINIC: return "Live medical staff attendance; patient treatment is not implemented"
+		Room.TYPE_CANTEEN, Room.TYPE_KITCHEN: return "Live meals/cook schedules; food stocks and production are not implemented"
+		Room.TYPE_HYGIENE_FACILITY: return "Live sanitation worker attendance; resident hygiene occurs at home; sanitation processing is not implemented"
+		Room.TYPE_SERVER_ROOM: return "Live IT/electrician attendance; network and electrical operation are not implemented"
+		Room.TYPE_BIO_FARM: return "PHYSICAL HOOK ONLY - agriculture/food production integration pending"
+		Room.TYPE_STORAGE: return "PHYSICAL HOOK ONLY - no inventory is assigned to this storage hook"
+		_: return "PHYSICAL HOOK ONLY - backend operation integration pending"
+
+static func get_incident_locations(ws: WorldState) -> Dictionary:
+	var result: Dictionary = SimulationReader.get_incidents_summary(ws)
+	for incident in result["active_incidents"]:
+		incident["room_id"] = _resolve_room_id(ws, "incident", int(incident["id"]), incident)
+		incident["physical_status"] = "Located at root cause" if int(incident["room_id"]) > 0 else "Silo-wide or unresolved root; no invented room"
+	return result
+
+static func get_stairs(ws: WorldState) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var state: Dictionary = ws.custom_data.get("spatial_travel", {})
+	var segments: Dictionary = state.get("segments", {})
+	var ids: Array = segments.keys()
+	ids.sort()
+	for id in ids:
+		var segment: Dictionary = segments[id]
+		var row: Dictionary = segment.duplicate(true)
+		row["occupancy"] = (segment["occupants"] as Dictionary).size()
+		row["queue_length"] = (segment["queue"] as Array).size()
+		row["congestion"] = float(row["occupancy"]) / float(maxi(1, int(row["capacity"])))
+		row["queue_penalty_ticks_estimate"] = ceili(float(row["queue_length"]) / float(maxi(1, int(row["capacity"])))) * int(row["base_travel_ticks"])
+		row["travel_time_ticks_estimate"] = int(row["base_travel_ticks"]) + int(row["queue_penalty_ticks_estimate"])
+		result.append(row)
+	return result

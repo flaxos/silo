@@ -20,6 +20,7 @@ const SUITES: Dictionary = {
 	"simulation": [
 		"res://tests/simulation/test_population_generation.gd",
 		"res://tests/simulation/test_daily_life.gd",
+		"res://tests/simulation/test_spatial_travel.gd",
 		"res://tests/simulation/test_material_economy.gd",
 		"res://tests/simulation/test_machinery_maintenance.gd",
 		"res://tests/simulation/test_dependency_loop.gd",
@@ -34,6 +35,7 @@ const SUITES: Dictionary = {
 		"res://tests/presentation/test_simulation_viewer.gd",
 		"res://tests/presentation/test_observability_api.gd",
 		"res://tests/presentation/test_physical_viewer.gd",
+		"res://tests/presentation/test_godot_world.gd",
 	]
 }
 

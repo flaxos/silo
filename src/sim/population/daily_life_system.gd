@@ -2,6 +2,8 @@
 class_name DailyLifeSystem
 extends BaseSystem
 
+const TravelModel = preload("res://src/sim/spatial/spatial_travel_model.gd")
+
 # Fast spatial cache: int room_id -> Vector2i(sector_id, level)
 var _room_spatial_cache: Dictionary = {}
 var _cached_persons: Array[Person] = []
@@ -14,11 +16,13 @@ func setup(world_state: Variant) -> void:
 	var ws: WorldState = world_state as WorldState
 	_build_room_spatial_cache(ws)
 	_rebuild_person_cache(ws)
+	TravelModel.initialize(ws)
 
 func tick(world_state: Variant) -> void:
 	var ws: WorldState = world_state as WorldState
 	var clock: SimClock = ws.sim_clock
 	var tick_of_day: int = clock.get_tick_of_day()
+	TravelModel.step(ws)
 	
 	if _cached_person_count == 0:
 		_rebuild_person_cache(ws)
@@ -29,11 +33,10 @@ func tick(world_state: Variant) -> void:
 		if not p.is_alive:
 			continue
 			
-		# 1. Handle in-progress travel
+		# 1. Authoritative graph travel is progressed centrally above. Citizens in
+		# transit wait for stair admission/arrival without per-person processing.
 		if p.current_activity == Person.ACTIVITY_TRAVELING:
-			p.step_travel()
-			if p.current_activity == Person.ACTIVITY_TRAVELING:
-				continue
+			continue
 				
 		# 2. Determine scheduled activity and destination room without dictionary allocation
 		var desired_activity: int = Person.ACTIVITY_IDLE
@@ -199,8 +202,7 @@ func tick(world_state: Variant) -> void:
 				can_travel = inst_sys.is_sector_travel_allowed(p.security_clearance, from_coord.x, to_coord.x)
 				
 			if can_travel:
-				var travel_ticks: int = compute_travel_ticks_fast(p.current_location_id, desired_room_id)
-				p.start_travel(desired_room_id, desired_activity, travel_ticks)
+				TravelModel.begin_journey(ws, p, desired_room_id, desired_activity)
 			else:
 				# Blocked by quarantine / security clearance
 				p.current_activity = Person.ACTIVITY_IDLE
@@ -224,6 +226,9 @@ func compute_travel_ticks_fast(from_id: int, to_id: int) -> int:
 			return 1 + (delta_level / 5) # 1 - 2 ticks
 	else:
 		return 2 + delta_sector + (delta_level / 5) # 2 - 4 ticks
+
+func compute_travel_ticks(ws: WorldState, from_id: int, to_id: int) -> int:
+	return TravelModel.compute_base_ticks(ws, from_id, to_id)
 
 func _build_room_spatial_cache(ws: WorldState) -> void:
 	_room_spatial_cache.clear()

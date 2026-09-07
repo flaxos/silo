@@ -30,7 +30,8 @@ const ROOM_TYPE_NAMES: Dictionary = {
 	19: "Air Handler",
 	20: "Power Plant",
 	21: "Staircase",
-	22: "Corridor"
+	22: "Corridor",
+	23: "Wastewater Treatment"
 }
 
 # Room type → display color (RGBA)
@@ -58,6 +59,7 @@ const ROOM_TYPE_COLORS: Dictionary = {
 	20: Color(0.90, 0.80, 0.25, 1.0),   # Power Plant: gold
 	21: Color(0.45, 0.45, 0.50, 1.0),   # Staircase: concrete grey
 	22: Color(0.40, 0.40, 0.42, 1.0),   # Corridor: dark grey
+	23: Color(0.28, 0.50, 0.55, 1.0),   # Wastewater treatment hook
 }
 
 # Activity → dot color for citizen rendering
