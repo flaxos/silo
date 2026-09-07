@@ -195,6 +195,21 @@ The SILO roadmap is strictly sequenced. Each sprint is gated by automated accept
 - **Deliverables**: Bounded psychological state on `Person` (`stress`, `fatigue`, `morale`, `burnout`, `absent_from_work`), grounded psychological system (`psychology_system.gd`), emergent worker absenteeism withdrawing scheduled labor via `DailyLifeSystem`, fatigue-induced machinery wear jitter, recreation restoration, invariant validation (`psychology_invariants.gd`), and observability endpoints (`/api/psychology_summary`, `/api/person_psychology`).
 - **Acceptance Gate**: Cohort divergence under stress/fatigue; emergent absenteeism halts production lines naturally; fatigued operators inflict extra wear on machines; all 19 headless assertions pass with 0 failures.
 
+### Sprint 20 — Relationships, Romance & Household Dynamics (Completed)
+- **Hypothesis**: Interpersonal relationships, romance, partnerships, and household reconfigurations emerge from real daily proximity and social exposure without artificial matching meters.
+- **Deliverables**: Authoritative relationship model (`relationship.gd`), interpersonal system (`relationship_system.gd`), incest taboo enforcement, partnership formation with reciprocal linkage, co-habitation movement, estrangement and household splitting, bereavement grief, invariant validation (`relationship_invariants.gd`), and observability endpoints (`/api/relationships`, `/api/person_relationships`, `/api/household_dynamics`).
+- **Acceptance Gate**: Partnerships form from physical exposure; partners co-habitate; estrangement splits households and spikes stress; bereavement triggers acute grief; all 24 headless assertions pass with 0 failures.
+
+### Sprint 21 — Genetics, Heredity & Population Health (Completed)
+- **Hypothesis**: A closed underground population maintains valid heredity, Mendelian blood types, and emergent inbreeding depression risks derived from actual genealogies without genome simulation.
+- **Deliverables**: Genetic traits on `Person` (`blood_type`, `trait_stamina`, `trait_resilience`, `trait_metabolism`, `congenital_conditions`), deterministic Mendelian inheritance & relatedness service (`genetics_model.gd`), recessive inbreeding risk mechanics, demographics birth integration (`_spawn_birth`), invariant validation (`genetics_invariants.gd`), and observability endpoints (`/api/genetics_summary`, `/api/person_genetics`).
+- **Acceptance Gate**: Mendelian blood type inheritance; accurate relationship coefficient ($r$) calculations; high relatedness generates `congenital_frailty`; strictly acyclic lineages; all 37 headless assertions pass with 0 failures.
+
+### Sprint 22 — Epidemics & Public Health (Completed)
+- **Hypothesis**: Contagious diseases spread through authentic physical contact patterns, and public health interventions (quarantine, school closures) create concrete economic trade-offs via labor withdrawal.
+- **Deliverables**: Authoritative pathogen model (`pathogen.gd`), epidemic system (`epidemic_system.gd`), SEIR disease progression, physical contact transmission (household, workplace, school), clinical healthcare treatment, quarantine and school closure interventions with grounded labor withdrawal, invariant validation (`epidemic_invariants.gd`), and observability endpoints (`/api/epidemic_status`, `/api/clinic_status`).
+- **Acceptance Gate**: Disease propagates along real contact structures; quarantine isolates carriers and halts transmission; symptomatic sickness and school closure mandate worker absenteeism; clinical treatment reduces mortality; all 16 headless assertions pass with 0 failures.
+
 ---
 
 ## Advanced Phases (Sprints 13–45)

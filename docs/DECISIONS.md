@@ -691,6 +691,93 @@ Citizens are not robots. Prolonged shifts, physical deprivation, dangerous work,
 - Zero global morale modifiers; individual psychological state directly maps to physical behavior.
 - Complete determinism and headless test coverage (19 assertions, 0 failures).
 
+---
+
+## ADR-025: Interpersonal Relationships, Romance & Dynamic Household Reconfiguration (Sprint 20)
+
+### Status
+Accepted
+
+### Context
+Human social cohesion, romance, partnerships, and household arrangements cannot be modeled by arbitrary matching sliders or detached from physical proximity. Relationships must emerge organically from daily exposure (co-residents, coworkers, school cohorts, neighbours) and influence crucial life outcomes: partnerships, co-habitation, separations, household splitting, emotional wellbeing (morale/stress buffers), and bereavement grief.
+
+### Decision
+1. **Authoritative Relationship Entity (`Relationship` in `src/sim/population/relationship.gd`)**:
+   - Tracks bilateral ties with normalized dimensions: `familiarity`, `affection`, `attraction`, `trust`, `conflict` in [0, 100].
+   - Status states: `STATUS_STRANGER`, `STATUS_ACQUAINTANCE`, `STATUS_FRIEND`, `STATUS_CLOSE_FRIEND`, `STATUS_ROMANTIC_INTEREST`, `STATUS_PARTNER`, `STATUS_ESTRANGED`.
+2. **Grounded Interaction & Romance (`RelationshipSystem`, `execution_order = 44`)**:
+   - Interaction sampling during daily routines (home, workplace, school, recreation).
+   - Incest taboo strictly prohibits romantic attraction or partnership between parent-child or siblings.
+   - High mutual attraction, affection, and familiarity trigger partnership proposals (`STATUS_PARTNER`), setting reciprocal `partner_id`.
+   - Co-habitation moves new partners into a shared household and home room.
+   - Estrangement/divorce (`conflict >= 80`, `affection <= 20`) dissolves partnerships, causing household splitting and emotional stress.
+   - Bereavement: Death of a partner, child, or close friend inflicts severe grief (+35 stress, -45 morale).
+3. **Invariants & Telemetry (`RelationshipInvariants`, `RelationshipReader`)**:
+   - Verifies reciprocal partner validity, incest taboo, bounds [0, 100].
+   - Exposes `/api/relationships`, `/api/person_relationships`, `/api/household_dynamics`.
+
+### Consequences
+- Partnerships and living arrangements emerge from physical and social exposure rather than random pairing.
+- Interpersonal harmony and conflict provide direct emotional buffers or stress penalties.
+- Complete determinism and headless test coverage (24 assertions, 0 failures).
+
+---
+
+## ADR-026: Deterministic Genetics, Heredity & Recessive Inbreeding Risk (Sprint 21)
+
+### Status
+Accepted
+
+### Context
+Multi-generational closed populations require believable heredity and population genetics without unnecessary molecular-scale simulations. Traits must have gameplay consequences, and inbreeding risks must emerge from actual genealogical trees.
+
+### Decision
+1. **Genetic Traits on `Person` (`src/sim/population/person.gd`)**:
+   - Mendelian blood types: `blood_type` in {"O+", "A+", "B+", "AB+", "O-", "A-", "B-", "AB-"}.
+   - Inherited physiological traits: `trait_stamina`, `trait_resilience`, `trait_metabolism` in [0.5, 1.5].
+   - Congenital conditions array (e.g. `congenital_frailty`).
+2. **Mendelian Inheritance & Coefficient of Relationship ($r$) (`GeneticsModel` in `src/sim/population/genetics_model.gd`)**:
+   - Allele sampling for ABO and Rh factors.
+   - Lineage graph traversal calculating exact $r$ ($r=0.5$ parent-child/siblings; $r=0.25$ half-siblings/uncle-niece/grandparents; $r=0.125$ first cousins; $0.0$ unrelated).
+   - Recessive inbreeding depression risk: If $r \ge 0.125$, child has probability of inheriting `congenital_frailty`, lowering baseline health to 85% and impairing stamina.
+3. **Invariants & Telemetry (`GeneticsInvariants`, `GeneticsReader`)**:
+   - Validates valid blood types, trait bounds, acyclic pedigrees, and population genetic diversity.
+   - Exposes `/api/genetics_summary`, `/api/person_genetics`.
+
+### Consequences
+- Multi-generational isolated populations sustain valid genealogies with emergent recessive risks.
+- Parentage is strictly acyclic; traits blend deterministically with parental heritage.
+- Complete determinism and headless test coverage (37 assertions, 0 failures).
+
+---
+
+## ADR-027: Contagious Epidemics, Contact Transmission & Public Health Isolation (Sprint 22)
+
+### Status
+Accepted
+
+### Context
+Disease transmission must emerge from actual physical and social contact structures rather than abstract habitat-wide infection meters. Public health measures (quarantine, school closures, clinical care) must exert concrete systemic trade-offs against labor availability and industrial production.
+
+### Decision
+1. **Authoritative Pathogen & SEIR Model (`Pathogen` in `src/sim/health/pathogen.gd`)**:
+   - States: `INFECTION_SUSCEPTIBLE`, `INFECTION_EXPOSED`, `INFECTION_INFECTIOUS`, `INFECTION_SYMPTOMATIC`, `INFECTION_RECOVERED`.
+   - Physical contact transmission along real edges: household members sharing sleeping quarters, coworkers during active shifts, students in classrooms.
+2. **Grounded Healthcare & Labor Withdrawal (`EpidemicSystem` in `src/sim/health/epidemic_system.gd`, `execution_order = 46`)**:
+   - Symptomatic patients are too sick to work (`absent_from_work = true`), naturally halting industrial lines.
+   - Doctors and nurses in clinic rooms treat admitted patients, reducing mortality by 80% and accelerating recovery.
+   - Quarantine policy (`quarantine_active`): isolates infectious/symptomatic citizens, preventing contact transmission while withdrawing labor.
+   - School closure (`schools_closed`): eliminates classroom transmission, but forces parents to remain home for childcare (`absent_from_work = true`), removing labor from the economy.
+3. **Invariants & Telemetry (`EpidemicInvariants`, `HealthReader`)**:
+   - Strict SEIR conservation ($S + E + I + Sy + R = \text{Living Population}$), non-negative counts, and clinic occupancy metrics.
+   - Exposes `/api/epidemic_status`, `/api/clinic_status`.
+
+### Consequences
+- Contagions spread through genuine physical encounters, creating authentic disease vectors.
+- Public health interventions directly conflict with economic productivity via labor withdrawal.
+- Complete determinism and headless test coverage (16 assertions, 0 failures).
+
+
 
 
 

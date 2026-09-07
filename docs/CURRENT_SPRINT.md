@@ -1,7 +1,10 @@
 # CURRENT_SPRINT.md — Active Sprint Tracking
 
 ```
-CURRENT: Sprint 20 — Relationships, Romance & Household Dynamics (Planned / Next)
+CURRENT: Sprint 23 — Advanced Spatial Model & Pathfinding (Phase C Planned / Next)
+PREVIOUS: Sprint 22 — Epidemics & Public Health (Completed & Verified)
+PREVIOUS: Sprint 21 — Genetics, Heredity & Population Health (Completed & Verified)
+PREVIOUS: Sprint 20 — Relationships, Romance & Household Dynamics (Completed & Verified)
 PREVIOUS: Sprint 19 — Psychology, Stress & Adaptation (Completed & Verified)
 PREVIOUS: Sprint 18 — Advanced Policing, Investigation & Justice (Completed & Verified)
 PREVIOUS: Sprint 17 — Crime & Underground Economy (Completed & Verified)
@@ -16,10 +19,51 @@ PREVIOUS: Sprint 12 — Political Identity & Legitimacy (Completed & Verified)
 
 ---
 
-## 1. Active Sprint: Sprint 20 — Relationships, Romance & Household Dynamics (READY / NEXT)
+## 1. Active Sprint: Sprint 23 — Advanced Spatial Model & Pathfinding (PHASE C PLANNED / NEXT)
 
 ### Goal
-Make interpersonal life materially influence generations, households, politics, and wellbeing. Model friendship, romance, family dynamics, and household formation/splitting emerging from physical proximity and co-working rather than arbitrary pairing.
+Upgrade the physicalisation layer into simulation-grade spatial movement with formal spatial hierarchies (Silo $\to$ Level $\to$ District $\to$ Zone $\to$ Room) and multi-speed transit queues.
+
+---
+
+## 2. Previous Sprint: Sprint 22 — Epidemics & Public Health (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Authoritative pathogen model (`src/sim/health/pathogen.gd`): incubation, infectiousness, severity, mortality, immunity duration.
+- [x] Grounded contagion system (`src/sim/health/epidemic_system.gd`): transmission along real physical edges (household, workplace, school, transit).
+- [x] SEIR progression: Susceptible $\to$ Exposed $\to$ Infectious $\to$ Symptomatic $\to$ Recovered.
+- [x] Clinical healthcare: doctors and nurses in clinics treat patients up to bed capacity, reducing mortality by 80%.
+- [x] Institutional public health policy: quarantine enforcement isolates carriers, withdrawing labor; school closures eliminate classroom transmission while mandating parental childcare absenteeism.
+- [x] Invariant validation (`src/sim/health/epidemic_invariants.gd`): SEIR conservation, non-negative counts, valid health bounds.
+- [x] Observability endpoints & read model: `HealthReader`, `/api/epidemic_status`, `/api/clinic_status`.
+- [x] Headless test suite (`tests/simulation/test_epidemics_and_public_health.gd` — 16 assertions passing).
+
+---
+
+## 3. Previous Sprint: Sprint 21 — Genetics, Heredity & Population Health (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Genetic traits on Person (`blood_type`, `trait_stamina`, `trait_resilience`, `trait_metabolism`, `congenital_conditions` in `src/sim/population/person.gd`).
+- [x] Deterministic Mendelian inheritance & relatedness service (`src/sim/population/genetics_model.gd`): ABO/Rh blood allele sampling, exact pedigree relationship coefficient ($r$) calculation.
+- [x] Recessive inbreeding risk mechanics: high parent relatedness ($r \ge 0.125$) generates risk of inheriting `congenital_frailty`.
+- [x] Integration with `DemographicsSystem._spawn_birth`: births inherit parental blood types and blended traits.
+- [x] Invariant validation (`src/sim/population/genetics_invariants.gd`): validates blood types, trait bounds [0.5, 1.5], and strictly acyclic lineages.
+- [x] Observability endpoints & read model: `GeneticsReader`, `/api/genetics_summary`, `/api/person_genetics`.
+- [x] Headless test suite (`tests/simulation/test_genetics_and_heredity.gd` — 37 assertions passing).
+
+---
+
+## 4. Previous Sprint: Sprint 20 — Relationships, Romance & Household Dynamics (COMPLETED & VERIFIED)
+
+### Deliverables Checklist
+- [x] Bounded bilateral relationship entity (`src/sim/population/relationship.gd`): familiarity, affection, attraction, trust, conflict in [0, 100], status progression.
+- [x] Grounded interpersonal system (`src/sim/population/relationship_system.gd`): daily routine interaction sampling, incest taboo enforcement ($r \ge 0.25$).
+- [x] Romantic partnerships and co-habitation: compatible adults form partnerships, link reciprocal `partner_id`, and move into shared households.
+- [x] Separation and emotional fallout: estrangement breaks partnerships, triggers household splitting, and inflicts stress/morale penalties.
+- [x] Bereavement: death of partners, children, or close friends inflicts acute grief (+35 stress, -45 morale).
+- [x] Invariant validation (`src/sim/population/relationship_invariants.gd`): validates reciprocal consistency, incest taboo, bounds [0, 100].
+- [x] Observability endpoints & read model: `RelationshipReader`, `/api/relationships`, `/api/person_relationships`, `/api/household_dynamics`.
+- [x] Headless test suite (`tests/simulation/test_relationships_and_household_dynamics.gd` — 24 assertions passing).
 
 ---
 

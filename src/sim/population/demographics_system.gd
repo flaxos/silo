@@ -2,6 +2,8 @@
 class_name DemographicsSystem
 extends BaseSystem
 
+const GeneticsModel = preload("res://src/sim/population/genetics_model.gd")
+
 const SYSTEM_ID: String = "demographics"
 const EXECUTION_ORDER: int = 40
 
@@ -175,6 +177,17 @@ func _spawn_birth(ws: WorldState, father: Person, mother: Person, current_tick: 
 	baby.home_room_id = mother.home_room_id
 	baby.current_location_id = mother.home_room_id
 	baby.current_activity = Person.ACTIVITY_SLEEPING
+	
+	# Genetic traits inheritance (Sprint 21)
+	baby.blood_type = GeneticsModel.inherit_blood_type(father.blood_type, mother.blood_type, rng)
+	var relatedness: float = GeneticsModel.compute_relatedness(registry, father, mother)
+	var traits: Dictionary = GeneticsModel.inherit_traits(father, mother, rng, relatedness)
+	baby.trait_stamina = float(traits.get("stamina", 1.0))
+	baby.trait_resilience = float(traits.get("resilience", 1.0))
+	baby.trait_metabolism = float(traits.get("metabolism", 1.0))
+	baby.congenital_conditions = traits.get("conditions", [])
+	if baby.congenital_conditions.has("congenital_frailty"):
+		baby.health_percent = 85.0
 	
 	# Register entity
 	baby.id = registry.register_entity("person", baby)

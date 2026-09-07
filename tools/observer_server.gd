@@ -25,6 +25,15 @@ const SecurityReader = preload("res://src/presentation/security_reader.gd")
 const PsychologySystem = preload("res://src/sim/population/psychology_system.gd")
 const PsychologyInvariants = preload("res://src/sim/population/psychology_invariants.gd")
 const PsychologyReader = preload("res://src/presentation/psychology_reader.gd")
+const RelationshipSystem = preload("res://src/sim/population/relationship_system.gd")
+const RelationshipInvariants = preload("res://src/sim/population/relationship_invariants.gd")
+const RelationshipReader = preload("res://src/presentation/relationship_reader.gd")
+const GeneticsModel = preload("res://src/sim/population/genetics_model.gd")
+const GeneticsInvariants = preload("res://src/sim/population/genetics_invariants.gd")
+const GeneticsReader = preload("res://src/presentation/genetics_reader.gd")
+const EpidemicSystem = preload("res://src/sim/health/epidemic_system.gd")
+const EpidemicInvariants = preload("res://src/sim/health/epidemic_invariants.gd")
+const HealthReader = preload("res://src/presentation/health_reader.gd")
 
 var server: TCPServer
 var port: int = DEFAULT_PORT
@@ -40,6 +49,8 @@ var action_sys: CollectiveActionSystem
 var crime_sys: CrimeSystem
 var sec_sys: SecuritySystem
 var psych_sys: PsychologySystem
+var rel_sys: RelationshipSystem
+var epi_sys: EpidemicSystem
 var daily_life: DailyLifeSystem
 var prod_sys: ProductionSystem
 var maint_sys: MaintenanceSystem
@@ -138,6 +149,8 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	crime_sys = CrimeSystem.new()
 	sec_sys = SecuritySystem.new()
 	psych_sys = PsychologySystem.new()
+	rel_sys = RelationshipSystem.new()
+	epi_sys = EpidemicSystem.new()
 	daily_life = DailyLifeSystem.new()
 	prod_sys = ProductionSystem.new()
 	maint_sys = MaintenanceSystem.new()
@@ -153,6 +166,8 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	engine.register_system(crime_sys)
 	engine.register_system(sec_sys)
 	engine.register_system(psych_sys)
+	engine.register_system(rel_sys)
+	engine.register_system(epi_sys)
 	engine.register_system(daily_life)
 	engine.register_system(maint_sys)
 	engine.register_system(prod_sys)
@@ -478,6 +493,30 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 			var pid: int = int(query_params.get("id", 1))
 			response_data = PsychologyReader.get_person_psychology(ws, pid)
 			
+		["GET", "/api/relationships"]:
+			response_data = RelationshipReader.get_relationships_summary(ws)
+			
+		["GET", "/api/person_relationships"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = {"relationships": RelationshipReader.get_person_relationships(ws, pid)}
+			
+		["GET", "/api/household_dynamics"]:
+			var hhid: int = int(query_params.get("id", 1))
+			response_data = RelationshipReader.get_household_dynamics(ws, hhid)
+			
+		["GET", "/api/genetics_summary"]:
+			response_data = GeneticsReader.get_population_genetics_summary(ws)
+			
+		["GET", "/api/person_genetics"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = GeneticsReader.get_person_genetics(ws, pid)
+			
+		["GET", "/api/epidemic_status"]:
+			response_data = HealthReader.get_epidemic_summary(ws)
+			
+		["GET", "/api/clinic_status"]:
+			response_data = HealthReader.get_clinic_summary(ws)
+			
 		["GET", "/api/illicit_trace"]:
 			var aid: int = int(query_params.get("id", query_params.get("action_id", 0)))
 			if aid <= 0:
@@ -545,10 +584,13 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 			var crime_val: Dictionary = CrimeInvariants.validate_all(ws)
 			var sec_val: Dictionary = SecurityInvariants.validate_all(ws)
 			var psych_val: Dictionary = PsychologyInvariants.validate_all(ws)
+			var rel_val: Dictionary = RelationshipInvariants.validate_all(ws)
+			var gen_val: Dictionary = GeneticsInvariants.validate_all(ws)
+			var epi_val: Dictionary = EpidemicInvariants.validate_all(ws)
 			var econ_sum: Dictionary = SimulationReader.get_economy_summary(ws)
 			var mach_sum: Dictionary = SimulationReader.get_machinery_summary(ws)
 			
-			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and info_val.get("is_valid", true) and action_val.get("is_valid", true) and crime_val.get("is_valid", true) and sec_val.get("is_valid", true) and psych_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
+			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and info_val.get("is_valid", true) and action_val.get("is_valid", true) and crime_val.get("is_valid", true) and sec_val.get("is_valid", true) and psych_val.get("is_valid", true) and rel_val.get("is_valid", true) and gen_val.get("is_valid", true) and epi_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
 			response_data = {
 				"is_valid": all_ok,
 				"checksum": ws.get_state_checksum(),
@@ -561,6 +603,9 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"crime_validation": crime_val,
 				"security_validation": sec_val,
 				"psychology_validation": psych_val,
+				"relationship_validation": rel_val,
+				"genetics_validation": gen_val,
+				"epidemic_validation": epi_val,
 				"mass_balance": {
 					"total_mass_kg": econ_sum["total_system_mass_kg"],
 					"seam_ore_kg": econ_sum["seam_ore_kg"],

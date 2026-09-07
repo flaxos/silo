@@ -101,6 +101,25 @@ var morale: float = 70.0       # 0.0 to 100.0
 var burnout: float = 0.0       # 0.0 to 100.0
 var absent_from_work: bool = false
 
+const INFECTION_SUSCEPTIBLE: int = 0
+const INFECTION_EXPOSED: int = 1
+const INFECTION_INFECTIOUS: int = 2
+const INFECTION_SYMPTOMATIC: int = 3
+const INFECTION_RECOVERED: int = 4
+
+# Genetic and hereditary traits (Sprint 21)
+var blood_type: String = "O+"
+var trait_stamina: float = 1.0       # 0.5 to 1.5
+var trait_resilience: float = 1.0    # 0.5 to 1.5
+var trait_metabolism: float = 1.0    # 0.5 to 1.5
+var congenital_conditions: Array[String] = []
+
+# Epidemic and health state (Sprint 22)
+var infection_stage: int = INFECTION_SUSCEPTIBLE
+var infection_tick: int = -1
+var pathogen_id: String = ""
+var is_quarantined: bool = false
+
 func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int = SEX_FEMALE, p_birth_tick: int = 0) -> void:
 	id = p_id
 	first_name = p_first
@@ -127,6 +146,15 @@ func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int 
 	morale = 70.0
 	burnout = 0.0
 	absent_from_work = false
+	blood_type = "O+"
+	trait_stamina = 1.0
+	trait_resilience = 1.0
+	trait_metabolism = 1.0
+	congenital_conditions = []
+	infection_stage = INFECTION_SUSCEPTIBLE
+	infection_tick = -1
+	pathogen_id = ""
+	is_quarantined = false
 	
 	occupation_id = "unassigned"
 	department_id = ""
@@ -494,6 +522,15 @@ func serialize() -> Dictionary:
 		"morale": morale,
 		"burnout": burnout,
 		"absent_from_work": absent_from_work,
+		"blood_type": blood_type,
+		"trait_stamina": trait_stamina,
+		"trait_resilience": trait_resilience,
+		"trait_metabolism": trait_metabolism,
+		"congenital_conditions": congenital_conditions.duplicate(),
+		"infection_stage": infection_stage,
+		"infection_tick": infection_tick,
+		"pathogen_id": pathogen_id,
+		"is_quarantined": is_quarantined,
 		"opinion_memories": memories_data,
 		"beliefs": beliefs_data
 	}
@@ -562,6 +599,17 @@ func deserialize(data: Dictionary) -> void:
 	morale = float(data.get("morale", 70.0))
 	burnout = float(data.get("burnout", 0.0))
 	absent_from_work = bool(data.get("absent_from_work", false))
+	blood_type = str(data.get("blood_type", "O+"))
+	trait_stamina = float(data.get("trait_stamina", 1.0))
+	trait_resilience = float(data.get("trait_resilience", 1.0))
+	trait_metabolism = float(data.get("trait_metabolism", 1.0))
+	congenital_conditions = []
+	for c in data.get("congenital_conditions", []):
+		congenital_conditions.append(str(c))
+	infection_stage = int(data.get("infection_stage", INFECTION_SUSCEPTIBLE))
+	infection_tick = int(data.get("infection_tick", -1))
+	pathogen_id = str(data.get("pathogen_id", ""))
+	is_quarantined = bool(data.get("is_quarantined", false))
 	
 	opinion_memories = []
 	for m in data.get("opinion_memories", []):
