@@ -1,0 +1,20 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but it is also human-readable.
+
+config_version=5
+
+[application]
+
+config/name="SILO"
+config/description="Deep deterministic simulation of a long-lived underground human civilisation."
+config/version="0.1.0"
+config/features=PackedStringArray("4.4", "Forward Plus")
+
+[debug]
+
+settings/stdout/verbose_stdout=false
+
+[filesystem]
+
+import/fbx/enabled=false

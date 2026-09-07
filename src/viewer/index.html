@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROJECT SILO — Authoritative Simulation Observability Dashboard</title>
+  <link rel="stylesheet" href="viewer.css">
+  <link rel="stylesheet" href="physical.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Header -->
+    <header id="main-header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-badge">PROJECT</span>
+          <span class="logo-title">SILO</span>
+          <span class="logo-version">OBSERVABILITY CONSOLE v1.0</span>
+        </div>
+        <div class="clock-display" id="clock-widget">
+          <span class="clock-time" id="clock-time-str">Year 1, Day 1 (00:00)</span>
+          <span class="clock-tick" id="clock-tick-badge">Tick 0</span>
+          <span class="clock-checksum" id="clock-checksum-badge">Checksum: 0x0</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="sim-controls">
+          <div class="btn-group">
+            <button class="btn btn-step" data-ticks="1" title="Step 1 tick (10m)">+1 Tick</button>
+            <button class="btn btn-step" data-ticks="6" title="Step 6 ticks (1h)">+1 Hour</button>
+            <button class="btn btn-step" data-ticks="144" title="Step 144 ticks (1d)">+1 Day</button>
+            <button class="btn btn-step" data-ticks="1008" title="Step 1008 ticks (7d)">+7 Days</button>
+          </div>
+          <div class="auto-step-controls">
+            <button class="btn btn-primary" id="btn-toggle-run">Auto-Step: OFF</button>
+            <select id="select-speed" class="form-select" title="Auto-step speed">
+              <option value="1">1 Tick / 0.5s</option>
+              <option value="6">6 Ticks / 0.5s (1 hr/s)</option>
+              <option value="24">24 Ticks / 0.5s (4 hrs/s)</option>
+              <option value="144">144 Ticks / 0.5s (1 day/s)</option>
+            </select>
+          </div>
+          <button class="btn btn-danger" id="btn-reset-sim">Reset Sim</button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="live-indicator">
+          <span class="status-dot green" id="live-dot"></span>
+          <span class="live-label" id="live-text">ONLINE</span>
+        </div>
+        <button class="btn btn-secondary" id="btn-refresh-now" title="Force refresh">↻ Refresh</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div id="workspace">
+      <!-- Navigation Sidebar -->
+      <nav id="nav-sidebar">
+        <div class="nav-section-title">CORE OBSERVABILITY</div>
+        <ul class="nav-menu">
+          <li><a href="#physical" class="nav-link active" data-tab="tab-physical"><span class="icon">◈</span> Live Physical Silo</a></li>
+          <li><a href="#overview" class="nav-link" data-tab="tab-overview"><span class="icon">📊</span> Overview & Telemetry</a></li>
+          <li><a href="#people" class="nav-link" data-tab="tab-people"><span class="icon">👥</span> Population (<span id="nav-pop-count">0</span>)</a></li>
+          <li><a href="#households" class="nav-link" data-tab="tab-households"><span class="icon">🏡</span> Households</a></li>
+          <li><a href="#locations" class="nav-link" data-tab="tab-locations"><span class="icon">🏢</span> Spatial & Rooms</a></li>
+          <li><a href="#labour" class="nav-link" data-tab="tab-labour"><span class="icon">💼</span> Labour & Education</a></li>
+        </ul>
+
+        <div class="nav-section-title">PHYSICAL SYSTEMS</div>
+        <ul class="nav-menu">
+          <li><a href="#economy" class="nav-link" data-tab="tab-economy"><span class="icon">⚙️</span> Material Economy</a></li>
+          <li><a href="#machinery" class="nav-link" data-tab="tab-machinery"><span class="icon">🔧</span> Machinery & Wear</a></li>
+          <li><a href="#causal-chain" class="nav-link" data-tab="tab-causal-chain"><span class="icon">🔗</span> 8-Step Causal Trace</a></li>
+          <li><a href="#utilities" class="nav-link" data-tab="tab-utilities"><span class="icon">💧</span> Water & Utilities</a></li>
+        </ul>
+
+        <div class="nav-section-title">GOVERNANCE & CRISES</div>
+        <ul class="nav-menu">
+          <li><a href="#institutions" class="nav-link" data-tab="tab-institutions"><span class="icon">🏛️</span> Institutions & Policy</a></li>
+          <li><a href="#politics" class="nav-link" data-tab="tab-politics"><span class="icon">⚖️</span> Politics & Legitimacy</a></li>
+          <li><a href="#factions" class="nav-link" data-tab="tab-factions"><span class="icon">🚩</span> Factions & Blocs (<span id="nav-faction-count">0</span>)</a></li>
+          <li><a href="#corruption" class="nav-link" data-tab="tab-corruption"><span class="icon">🕵️</span> Corruption & Patronage (<span id="nav-corr-count">0</span>)</a></li>
+          <li><a href="#incidents" class="nav-link" data-tab="tab-incidents"><span class="icon">🚨</span> Incidents & Crises (<span id="nav-inc-count">0</span>)</a></li>
+          <li><a href="#timeline" class="nav-link" data-tab="tab-timeline"><span class="icon">📜</span> Event Timeline</a></li>
+          <li><a href="#dependencies" class="nav-link" data-tab="tab-dependencies"><span class="icon">🕸️</span> Feedback Loops</a></li>
+        </ul>
+
+        <div class="nav-section-title">VERIFICATION & ARCHITECTURE</div>
+        <ul class="nav-menu">
+          <li><a href="#invariants" class="nav-link" data-tab="tab-invariants"><span class="icon">🛡️</span> Invariants & Checks</a></li>
+          <li><a href="#wiring" class="nav-link" data-tab="tab-wiring"><span class="icon">🧩</span> 25-System Matrix</a></li>
+          <li><a href="#performance" class="nav-link" data-tab="tab-performance"><span class="icon">⚡</span> Performance & Bench</a></li>
+          <li><a href="#raw" class="nav-link" data-tab="tab-raw"><span class="icon">🔍</span> Raw State Inspector</a></li>
+        </ul>
+      </nav>
+
+      <!-- Main Content Area with Tab Panels -->
+      <main id="tab-content-area">
+
+        <section id="tab-physical" class="tab-panel active physical-tab" aria-label="Live physical silo viewer">
+          <div class="physical-shell">
+            <aside class="physical-tools">
+              <div class="physical-brand"><span class="pulse"></span><div><strong>LIVE CUTAWAY</strong><small>AUTHORITATIVE STATE</small></div></div>
+              <label class="physical-search-label" for="physical-search">FIND IN SILO</label>
+              <div class="physical-search-row"><input id="physical-search" type="search" placeholder="Person, home, room, machine…" autocomplete="off"><button id="physical-search-button" title="Search">⌕</button></div>
+              <div id="physical-search-results" class="physical-search-results" role="listbox"></div>
+              <div class="physical-section"><div class="physical-section-title">LEVELS <button id="physical-show-all">ALL</button></div><div id="physical-levels" class="physical-levels"></div></div>
+              <div class="physical-section"><div class="physical-section-title">OVERLAYS</div><div id="physical-overlays" class="physical-overlays"></div></div>
+              <div class="physical-view-buttons"><button id="physical-fit">▣ Fit silo</button><button id="physical-reset-view">⊙ Reset view</button></div>
+              <div class="physical-legend"><span><i class="dot worker"></i>Adult</span><span><i class="dot child"></i>Child/student</span><span><i class="dot security"></i>Security</span><span><i class="dot medical"></i>Medical</span><span><i class="dot engineering"></i>Engineering</span></div>
+            </aside>
+            <div class="physical-stage" id="physical-stage">
+              <canvas id="physical-canvas" aria-label="Interactive cutaway map"></canvas>
+              <div class="rock-label">SUBTERRANEAN HABITAT • PHYSICAL PROJECTION</div>
+              <div id="physical-level-chip" class="physical-level-chip">WHOLE SILO</div>
+              <div id="physical-error" class="physical-error hidden"></div>
+              <div class="physical-zoom"><button data-zoom="in">+</button><button data-zoom="out">−</button></div>
+            </div>
+            <aside class="physical-details" id="physical-details">
+              <div class="details-empty"><span class="details-reticle">◎</span><h3>SELECT AN ENTITY</h3><p>Choose a room, resident, household, machine, or incident in the cutaway.</p></div>
+            </aside>
+          </div>
+          <footer class="physical-status"><span id="physical-transport">CONNECTING</span><span id="physical-status-clock">—</span><span id="physical-status-pop">0 RESIDENTS</span><span id="physical-status-seed">SEED —</span><span id="physical-status-checksum">CHECKSUM —</span><span id="physical-metrics">0 FPS • API —</span></footer>
+        </section>
+        
+        <!-- TAB 1: OVERVIEW -->
+        <section id="tab-overview" class="tab-panel">
+          <div class="panel-header">
+            <h2>System Overview & Authoritative Telemetry</h2>
+            <div class="header-tags">
+              <span class="badge badge-success">Deterministic RNG</span>
+              <span class="badge badge-info">Zero State Mutations on Read</span>
+            </div>
+          </div>
+
+          <!-- Top Metric Cards Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">LIVING CITIZENS</div>
+              <div class="metric-value text-accent" id="metric-living-pop">0</div>
+              <div class="metric-sub" id="metric-pop-breakdown">0 Adults · 0 Students · 0 Children</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">WATER RESERVOIR</div>
+              <div class="metric-value text-info" id="metric-water-liters">0.0 L</div>
+              <div class="metric-sub" id="metric-water-percent">0.0% Capacity (0.0 L net)</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">MASS BALANCE ERROR</div>
+              <div class="metric-value text-success" id="metric-mass-error">0.0000 kg</div>
+              <div class="metric-sub" id="metric-mass-total">100,000 kg Conserved</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">MACHINERY HEALTH</div>
+              <div class="metric-value text-warning" id="metric-mach-health">100%</div>
+              <div class="metric-sub" id="metric-mach-breakdown">0 Nominal · 0 Degraded · 0 Broken</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">SOCIAL TENSION</div>
+              <div class="metric-value text-primary" id="metric-social-tension">0.00</div>
+              <div class="metric-sub" id="metric-tension-status">Tension Status: Nominal</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">ACTIVE CRISES</div>
+              <div class="metric-value" id="metric-active-crises">0</div>
+              <div class="metric-sub" id="metric-crises-sub">0 Critical Emergencies</div>
+            </div>
+          </div>
+
+          <!-- Overview Sub-sections -->
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>👥 Population Demographics & Routines</h3>
+                <a href="#people" class="card-link">View All People →</a>
+              </div>
+              <div class="card-body">
+                <div class="stat-row"><span>Infants (0-2y):</span> <strong id="ov-infants">0</strong></div>
+                <div class="stat-row"><span>Children (3-5y):</span> <strong id="ov-children">0</strong></div>
+                <div class="stat-row"><span>Students (6-17y):</span> <strong id="ov-students">0</strong></div>
+                <div class="stat-row"><span>Adults (18-59y):</span> <strong id="ov-adults">0</strong></div>
+                <div class="stat-row"><span>Elders (60+y):</span> <strong id="ov-elders">0</strong></div>
+                <div class="stat-row"><span>Employed Workforce:</span> <strong id="ov-employed">0</strong></div>
+                <hr class="divider">
+                <div class="stat-row"><span>Average Hydration:</span> <strong id="ov-hydration">100.0%</strong></div>
+                <div class="stat-row"><span>Severely Dehydrated:</span> <strong id="ov-dehydrated" class="text-danger">0</strong></div>
+                <div class="stat-row"><span>Average Health:</span> <strong id="ov-health">100.0%</strong></div>
+                <div class="stat-row"><span>Average Education:</span> <strong id="ov-education">0.0 pts</strong></div>
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>⚙️ Material Stocks & Conservation</h3>
+                <a href="#economy" class="card-link">View Production Chain →</a>
+              </div>
+              <div class="card-body">
+                <div class="stat-row"><span>Geological Seam Ore:</span> <strong id="ov-seam-ore">0.0 kg</strong></div>
+                <div class="stat-row"><span>Iron Ore (Extracted):</span> <strong id="ov-iron-ore">0.0 kg</strong></div>
+                <div class="stat-row"><span>Processed Ore:</span> <strong id="ov-proc-ore">0.0 kg</strong></div>
+                <div class="stat-row"><span>Metal Stock (Ingots):</span> <strong id="ov-metal-stock">0.0 kg</strong></div>
+                <div class="stat-row"><span>Machined Bearings (Units):</span> <strong id="ov-bearings">0.0</strong></div>
+                <div class="stat-row"><span>Installed Spare Parts Mass:</span> <strong id="ov-installed-mass">0.0 kg</strong></div>
+                <div class="stat-row"><span>Slag Tailings Waste:</span> <strong id="ov-slag">0.0 kg</strong></div>
+                <div class="stat-row"><span>Metal Swarf Waste:</span> <strong id="ov-swarf">0.0 kg</strong></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: PEOPLE -->
+        <section id="tab-people" class="tab-panel">
+          <div class="panel-header">
+            <h2>Resident Population Register</h2>
+            <div class="toolbar-controls">
+              <input type="text" id="filter-person-search" class="form-input" placeholder="Search by name or ID...">
+              <select id="filter-person-stage" class="form-select">
+                <option value="all">All Life Stages</option>
+                <option value="infant">Infant (0-2)</option>
+                <option value="child">Child (3-5)</option>
+                <option value="student">Student (6-17)</option>
+                <option value="adult">Adult (18-59)</option>
+                <option value="elder">Elder (60+)</option>
+              </select>
+              <select id="filter-person-status" class="form-select">
+                <option value="all">All Statuses</option>
+                <option value="living">Living Only</option>
+                <option value="deceased">Deceased Only</option>
+                <option value="dehydrated">Dehydrated Only</option>
+              </select>
+              <button class="btn btn-primary" id="btn-search-people">Filter</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="table-people">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Sex</th>
+                  <th>Age</th>
+                  <th>Stage</th>
+                  <th>Occupation</th>
+                  <th>Department</th>
+                  <th>Current Activity</th>
+                  <th>Hydration</th>
+                  <th>Health</th>
+                  <th>Room ID</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-people">
+                <tr><td colspan="12" class="text-center">Loading population data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-bar">
+            <span id="people-page-info">Showing page 1</span>
+            <div class="btn-group">
+              <button class="btn btn-secondary" id="btn-people-prev">Previous</button>
+              <button class="btn btn-secondary" id="btn-people-next">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: HOUSEHOLDS -->
+        <section id="tab-households" class="tab-panel">
+          <div class="panel-header">
+            <h2>Habitation Households & Co-residence</h2>
+          </div>
+          <div class="table-container">
+            <table class="data-table" id="table-households">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Household Name</th>
+                  <th>Head of House</th>
+                  <th>Home Room</th>
+                  <th>Member Count</th>
+                  <th>Members Breakdown</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-households">
+                <tr><td colspan="6" class="text-center">Loading household registry...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- TAB 4: LOCATIONS / SPATIAL -->
+        <section id="tab-locations" class="tab-panel">
+          <div class="panel-header">
+            <h2>Habitat Spatial Architecture & Occupancy</h2>
+          </div>
+          <div id="spatial-tree-container" class="spatial-grid">
+            <div class="card"><div class="card-body">Loading sector and room layout...</div></div>
+          </div>
+        </section>
+
+        <!-- TAB 5: LABOUR & EDUCATION -->
+        <section id="tab-labour" class="tab-panel">
+          <div class="panel-header">
+            <h2>Labour Force, Staffing & Education Roster</h2>
+          </div>
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header"><h3>🏢 Department Staffing</h3></div>
+              <div class="card-body" id="labour-dept-container">Loading departments...</div>
+            </div>
+            <div class="card column-half">
+              <div class="card-header"><h3>🎓 Education System & Students</h3></div>
+              <div class="card-body" id="labour-students-container">Loading school rosters...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 6: MATERIAL ECONOMY -->
+        <section id="tab-economy" class="tab-panel">
+          <div class="panel-header">
+            <h2>Material Economy & 4-Stage Production Chain</h2>
+          </div>
+
+          <div class="card mass-balance-banner">
+            <div class="banner-title">⚡ STRICT MATERIAL CONSERVATION BALANCE</div>
+            <div class="balance-equation" id="econ-balance-formula">
+              [Seam Ore: 0 kg] + [Total Inventory Stocks: 0 kg] + [Installed Spares: 0 kg] = [Total: 100,000 kg]
+            </div>
+            <div class="balance-status" id="econ-balance-status">Invariant Error: 0.000000 kg (CONSERVED)</div>
+          </div>
+
+          <div class="pipeline-flow-diagram">
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 1</div>
+              <div class="step-title">Deep Mine</div>
+              <div class="step-desc">Seam Extraction</div>
+              <div class="step-stock" id="pipe-iron-ore">Iron Ore: 0 kg</div>
+            </div>
+            <div class="pipeline-arrow">➔</div>
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 2</div>
+              <div class="step-title">Beneficiation</div>
+              <div class="step-desc">Crushing & Sorting</div>
+              <div class="step-stock" id="pipe-proc-ore">Processed Ore: 0 kg</div>
+            </div>
+            <div class="pipeline-arrow">➔</div>
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 3</div>
+              <div class="step-title">Induction Smelter</div>
+              <div class="step-desc">Foundry Casting</div>
+              <div class="step-stock" id="pipe-metal-stock">Metal Stock: 0 kg</div>
+            </div>
+            <div class="pipeline-arrow">➔</div>
+            <div class="pipeline-step">
+              <div class="step-num">STAGE 4</div>
+              <div class="step-title">Machine Shop</div>
+              <div class="step-desc">Lathe Precision Milling</div>
+              <div class="step-stock" id="pipe-bearings">Machined Bearings: 0</div>
+            </div>
+          </div>
+
+          <div class="table-container" style="margin-top: 1.5rem;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Resource ID</th>
+                  <th>Category</th>
+                  <th>Habitat Total Stock</th>
+                  <th>Unit</th>
+                  <th>Downstream Use Case</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-econ-resources">
+                <tr><td colspan="5" class="text-center">Loading resource registry...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- TAB 7: MACHINERY & WEAR -->
+        <section id="tab-machinery" class="tab-panel">
+          <div class="panel-header">
+            <h2>Critical Infrastructure & Machinery Degradation</h2>
+          </div>
+          <div class="machinery-grid" id="machinery-container">
+            <div class="card"><div class="card-body">Loading machinery telemetry...</div></div>
+          </div>
+        </section>
+
+        <!-- TAB 8: 8-STEP CAUSAL TRACE -->
+        <section id="tab-causal-chain" class="tab-panel">
+          <div class="panel-header">
+            <h2>8-Step Physical Traceability (Seam ➔ Hydration)</h2>
+            <div class="toolbar-controls">
+              <span class="badge badge-info">Authoritative Physical Lineage</span>
+            </div>
+          </div>
+          <div class="card" id="causal-chain-container">
+            <div class="card-body">Loading 8-step causal lineage...</div>
+          </div>
+        </section>
+
+        <!-- TAB 9: UTILITIES & WATER -->
+        <section id="tab-utilities" class="tab-panel">
+          <div class="panel-header">
+            <h2>Aquifer Extraction & Water Utility Distribution</h2>
+          </div>
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header"><h3>🚰 Central Water Reservoir</h3></div>
+              <div class="card-body" id="util-reservoir-card">Loading reservoir status...</div>
+            </div>
+            <div class="card column-half">
+              <div class="card-header"><h3>📊 Pumping & Consumption Rates</h3></div>
+              <div class="card-body" id="util-throughput-card">Loading flow metrics...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 10: INSTITUTIONS & POLICY -->
+        <section id="tab-institutions" class="tab-panel">
+          <div class="panel-header">
+            <h2>Institutions, Policies & Executive Directives</h2>
+          </div>
+
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header"><h3>📜 Active Regulatory Policies</h3></div>
+              <div class="card-body">
+                <div id="policies-active-list">Loading policies...</div>
+                <hr class="divider">
+                <h4>Enact Available Policy</h4>
+                <div class="form-row">
+                  <select id="select-enact-policy" class="form-select">
+                    <option value="water_rationing_level_1">Water Rationing: Level 1 (-25% consumption)</option>
+                    <option value="water_rationing_level_2">Water Rationing: Level 2 (-50% consumption)</option>
+                    <option value="emergency_overtime_engineering">Emergency Overtime: Engineering (+50% repair)</option>
+                    <option value="mandatory_curfew">Mandatory Curfew (Tension mitigation)</option>
+                  </select>
+                  <button class="btn btn-primary" id="btn-enact-policy">Enact Policy</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header"><h3>⚡ Executive Directives & Interventions</h3></div>
+              <div class="card-body">
+                <div id="orders-active-list">Loading executive orders...</div>
+                <hr class="divider">
+                <h4>Issue Executive Directive</h4>
+                <div class="form-row">
+                  <select id="select-issue-order" class="form-select">
+                    <option value="emergency_pump_overhaul">Emergency Pump Overhaul (Duration: 144 ticks)</option>
+                    <option value="double_shift_machining">Double Shift: Machine Shop (Duration: 288 ticks)</option>
+                    <option value="deep_mine_boost">Mining Quota Surge (Duration: 144 ticks)</option>
+                  </select>
+                  <button class="btn btn-warning" id="btn-issue-order">Dispatch Order</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- TAB 11: POLITICS & LEGITIMACY -->
+        <section id="tab-politics" class="tab-panel">
+          <div class="panel-header">
+            <h2>Political Identity, Institutional Trust & Legitimacy</h2>
+            <div class="header-tags">
+              <span class="badge badge-success">30-Day Memory Half-Life</span>
+              <span class="badge badge-info">Lived Experiences Traceability</span>
+            </div>
+          </div>
+
+          <!-- Top Politics Cards Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">HABITAT LEGITIMACY</div>
+              <div class="metric-value text-accent" id="pol-metric-legitimacy">0.0%</div>
+              <div class="metric-sub" id="pol-metric-legitimacy-sub">Derived Authority Index</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">AVERAGE TRUST</div>
+              <div class="metric-value text-info" id="pol-metric-trust">0.00</div>
+              <div class="metric-sub">Mean Institutional Trust</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">CLASS RESENTMENT</div>
+              <div class="metric-value text-danger" id="pol-metric-resentment">0.00</div>
+              <div class="metric-sub" id="pol-metric-resentment-sub">Stratification Tension</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">PERCEIVED FAIRNESS</div>
+              <div class="metric-value text-success" id="pol-metric-fairness">0.00</div>
+              <div class="metric-sub">Distributive Equity</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">PERCEIVED SECURITY</div>
+              <div class="metric-value text-warning" id="pol-metric-security">0.00</div>
+              <div class="metric-sub">Safety & Order Confidence</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">ACTIVE MEMORIES</div>
+              <div class="metric-value" id="pol-metric-memories">0</div>
+              <div class="metric-sub">Tracked Experience Records</div>
+            </div>
+          </div>
+
+          <!-- Departmental Trust & Political Values -->
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>🏛️ Departmental Trust Ratings</h3>
+              </div>
+              <div class="card-body" id="pol-dept-trust-card">
+                Loading departmental trust metrics...
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>⚖️ Habitat Political Values Profile</h3>
+              </div>
+              <div class="card-body" id="pol-values-card">
+                Loading political values spectrum...
+              </div>
+            </div>
+          </div>
+
+          <!-- Citizen Political Dossier & Memory Inspector -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🔍 Citizen Political Dossier & Memory Trace</h3>
+              <div class="table-controls">
+                <input type="number" id="pol-citizen-id-input" class="form-input" placeholder="Citizen ID (e.g. 1)" style="width: 160px;">
+                <button class="btn btn-primary" id="pol-inspect-btn">Inspect Dossier</button>
+              </div>
+            </div>
+            <div class="card-body" id="pol-citizen-dossier">
+              <p class="text-muted">Select or enter a citizen ID to inspect their causal political perceptions and lived opinion memories.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB: FACTIONS & SOCIAL MOVEMENTS -->
+        <section id="tab-factions" class="tab-panel">
+          <div class="panel-header">
+            <h2>Emergent Factions, Interest Blocs & Social Networks</h2>
+            <div class="header-tags">
+              <span class="badge badge-accent">Dynamic Social Clustering</span>
+              <span class="badge badge-success">Word-of-Mouth Recruitment</span>
+            </div>
+          </div>
+
+          <!-- Top Faction Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">ACTIVE FACTIONS</div>
+              <div class="metric-value text-accent" id="fact-metric-active">0</div>
+              <div class="metric-sub" id="fact-metric-total-sub">0 Emergent Movements</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">TOTAL MEMBERS</div>
+              <div class="metric-value text-info" id="fact-metric-members">0</div>
+              <div class="metric-sub">Committed Organised Base</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">SYMPATHISERS</div>
+              <div class="metric-value text-warning" id="fact-metric-sympathisers">0</div>
+              <div class="metric-sub">Socially Aligned Base</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">RECRUITMENT EVENTS</div>
+              <div class="metric-value text-success" id="fact-metric-recruitment">0</div>
+              <div class="metric-sub">Word-of-Mouth Conversions</div>
+            </div>
+          </div>
+
+          <!-- Factions List & Detail View -->
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>🚩 Active Movements & Blocs</h3>
+              </div>
+              <div class="card-body" id="factions-list-container">
+                Loading emergent factions...
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header">
+                <h3 id="faction-detail-title">📑 Faction Dossier & Grievances</h3>
+              </div>
+              <div class="card-body" id="faction-detail-container">
+                <p class="text-muted">Select a faction from the list to view ideology profile, grievance agenda, policy approvals, and institutional penetration.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Citizen Social Network Graph Explorer -->
+          <div class="card">
+            <div class="card-header">
+              <h3>🕸️ Citizen Bounded Social Network Inspector</h3>
+              <div class="table-controls">
+                <input type="number" id="social-citizen-id-input" class="form-input" placeholder="Citizen ID (e.g. 1)" style="width: 160px;">
+                <button class="btn btn-primary" id="social-inspect-btn">Inspect Network</button>
+              </div>
+            </div>
+            <div class="card-body" id="social-network-container">
+              <p class="text-muted">Inspect bounded social ties (family, household co-residents, coworkers, neighbors, shared crisis survivors) and influence propagation pathways.</p>
+            </div>
+          </div>
+        </section>
+        
+        <!-- TAB: CORRUPTION & PATRONAGE -->
+        <section id="tab-corruption" class="tab-panel">
+          <div class="panel-header">
+            <h2>Corruption, Patronage & Informal Power Dynamics</h2>
+            <div class="header-tags">
+              <span class="badge badge-accent">100% Mass Conserved</span>
+              <span class="badge badge-warning">Physical-Epistemic Divergence</span>
+              <span class="badge badge-info">Bounded Social Graph Audits</span>
+            </div>
+          </div>
+
+          <!-- Top Corruption Metrics Grid -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">INFORMAL FAVOURS</div>
+              <div class="metric-value text-accent" id="corr-metric-favours">0</div>
+              <div class="metric-sub" id="corr-metric-favours-sub">0 Active Debts (0 Settled)</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">PATRON CLUSTERS</div>
+              <div class="metric-value text-info" id="corr-metric-clusters">0</div>
+              <div class="metric-sub" id="corr-metric-clusters-sub">Informal Power Blocs</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">ILLICIT DIVERSIONS</div>
+              <div class="metric-value text-warning" id="corr-metric-actions">0</div>
+              <div class="metric-sub" id="corr-metric-actions-sub">0 Discovered (0 Concealed)</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">RECORD DISCREPANCY</div>
+              <div class="metric-value text-danger" id="corr-metric-discrepancy">0.0 kg</div>
+              <div class="metric-sub" id="corr-metric-discrepancy-sub">Official vs Physical Delta</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">SANCTIONS APPLIED</div>
+              <div class="metric-value text-success" id="corr-metric-sanctions">0</div>
+              <div class="metric-sub" id="corr-metric-sanctions-sub">Demotions & Revocations</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">AUDIT DETECTION</div>
+              <div class="metric-value" id="corr-metric-detection">0.0%</div>
+              <div class="metric-sub">Whistleblower & Audit Rate</div>
+            </div>
+          </div>
+
+          <!-- Main Layout Columns -->
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>🤝 Patron-Client Clusters & Informal Power Hierarchy</h3>
+              </div>
+              <div class="card-body" id="corr-patronage-container">
+                Loading patronage clusters...
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>📋 Illicit Actions & Concealment Register</h3>
+              </div>
+              <div class="card-body" id="corr-actions-container">
+                Loading illicit diversion register...
+              </div>
+            </div>
+          </div>
+
+          <div class="overview-columns" style="margin-top: 1rem;">
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>⚖️ Nepotism & Conflict of Interest Risk Matrix</h3>
+              </div>
+              <div class="card-body" id="corr-coi-container">
+                Loading conflict of interest matrix...
+              </div>
+            </div>
+
+            <div class="card column-half">
+              <div class="card-header">
+                <h3>📜 Audit & Whistleblower Investigation Log</h3>
+              </div>
+              <div class="card-body" id="corr-audit-container">
+                Loading investigation log...
+              </div>
+            </div>
+          </div>
+
+          <!-- 7-Step Causal Action Trace Explorer -->
+          <div class="card" style="margin-top: 1rem;">
+            <div class="card-header">
+              <h3>🔍 7-Step Authoritative Causal Action Trace Inspector</h3>
+              <div class="table-controls">
+                <input type="number" id="corr-trace-id-input" class="form-input" placeholder="Action ID (e.g. 1)" style="width: 160px;">
+                <button class="btn btn-primary" id="corr-trace-btn">Inspect Causal Trace</button>
+              </div>
+            </div>
+            <div class="card-body" id="corr-trace-container">
+              <p class="text-muted">Enter an Illicit Action ID or click "Trace" on any record in the register to view the authoritative 7-step lineage: <em>Actor ➔ Incentive/Favour ➔ Illicit Action ➔ Target Resource ➔ Hidden Record Discrepancy ➔ Discovery Path ➔ Institutional Consequence</em>.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 12: INCIDENTS & CRISES -->
+        <section id="tab-incidents" class="tab-panel">
+          <div class="panel-header">
+            <h2>Diagnostic Incident Detector & Crisis Telemetry</h2>
+          </div>
+          <div id="incidents-container">
+            <div class="card"><div class="card-body">Loading active incidents...</div></div>
+          </div>
+        </section>
+
+        <!-- TAB 12: TIMELINE -->
+        <section id="tab-timeline" class="tab-panel">
+          <div class="panel-header">
+            <h2>Simulation Event Timeline & Chronological Journal</h2>
+          </div>
+          <div class="timeline-container" id="timeline-events-list">
+            <div class="text-center">Loading chronological events...</div>
+          </div>
+        </section>
+
+        <!-- TAB 13: DEPENDENCIES -->
+        <section id="tab-dependencies" class="tab-panel">
+          <div class="panel-header">
+            <h2>Systemic Interdependency & Closed Feedback Loop</h2>
+          </div>
+          <div class="card">
+            <div class="card-body" id="dependencies-diagram-card">
+              Loading closed loop topology...
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 14: INVARIANTS & CHECKS -->
+        <section id="tab-invariants" class="tab-panel">
+          <div class="panel-header">
+            <h2>Authoritative Invariants & Integrity Verification</h2>
+            <button class="btn btn-primary" id="btn-run-validation">Run All Invariant Checks</button>
+          </div>
+          <div id="invariants-report-container">
+            <div class="card"><div class="card-body">Click "Run All Invariant Checks" to audit state invariants.</div></div>
+          </div>
+        </section>
+
+        <!-- TAB 15: 22-SYSTEM MATRIX -->
+        <section id="tab-wiring" class="tab-panel">
+          <div class="panel-header">
+            <h2>22 Discovered Systems & Wiring Matrix</h2>
+            <span class="badge badge-success">100% GREEN COVERAGE</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>System</th>
+                  <th>Source File</th>
+                  <th>Pipeline Execution Order</th>
+                  <th>API Endpoint</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-wiring-matrix">
+                <tr><td colspan="5" class="text-center">Loading wiring matrix...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- TAB 16: PERFORMANCE & BENCH -->
+        <section id="tab-performance" class="tab-panel">
+          <div class="panel-header">
+            <h2>Engine Performance Telemetry & Scalability</h2>
+          </div>
+          <div class="overview-columns">
+            <div class="card column-half">
+              <div class="card-header"><h3>⚡ Step Throughput Metrics</h3></div>
+              <div class="card-body" id="perf-throughput-card">Loading benchmark telemetry...</div>
+            </div>
+            <div class="card column-half">
+              <div class="card-header"><h3>📦 Entity Registry Allocations</h3></div>
+              <div class="card-body" id="perf-entity-card">Loading entity counts...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 17: RAW STATE INSPECTOR -->
+        <section id="tab-raw" class="tab-panel">
+          <div class="panel-header">
+            <h2>Authoritative Raw State Inspector</h2>
+            <div class="toolbar-controls">
+              <select id="raw-entity-type" class="form-select">
+                <option value="world">Full WorldState</option>
+                <option value="person">Person</option>
+                <option value="household">Household</option>
+                <option value="room">Room</option>
+                <option value="inventory">Inventory</option>
+                <option value="machine">Machine</option>
+              </select>
+              <input type="number" id="raw-entity-id" class="form-input" placeholder="Entity ID (e.g. 1)" value="1">
+              <button class="btn btn-primary" id="btn-fetch-raw">Fetch Raw JSON</button>
+            </div>
+          </div>
+          <pre id="raw-json-viewer" class="json-code-box">Select an entity and click "Fetch Raw JSON"...</pre>
+        </section>
+
+      </main>
+    </div>
+
+    <!-- Entity Detail Modal / Drawer -->
+    <div id="entity-modal" class="modal-backdrop hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 id="modal-title">Entity Detail</h3>
+          <button class="btn-close" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-content">
+          Loading entity profile...
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="viewer.js"></script>
+  <script src="physical.js"></script>
+</body>
+</html>
