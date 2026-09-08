@@ -184,6 +184,28 @@ func get_maintenance_trigger_wear() -> float:
 		return float(maint_pol.parameters.get("maintenance_wear_threshold", 60.0))
 	return 60.0
 
+## Standing Engineering delegation to IT: one early-service scheduling slot.
+## No power to conscript labour, set industrial quotas, or bypass repair inputs.
+func request_it_service(ws: WorldState, machine_id: int) -> bool:
+	if str(ws.custom_data.get("player_role", "")) != OperationsConfig.ROLE_IT or not bool(ws.custom_data.get("it_service_delegation", false)):
+		return false
+	var machine := ws.entity_registry.get_entity(machine_id) as WaterPump
+	if not machine or not machine.needs_maintenance(OperationsConfig.EARLY_WEAR):
+		return false
+	if active_orders.has(OperationsConfig.ORDER_EARLY_SERVICE):
+		return false
+	var order := ExecutiveOrder.new(OperationsConfig.ORDER_EARLY_SERVICE, OperationsConfig.ORDER_EARLY_SERVICE,
+		"IT request: early Engineering service", Occupation.DEPT_IT, str(machine_id), OperationsConfig.SERVICE_TICKS,
+		{"maintenance_wear_threshold": OperationsConfig.EARLY_WEAR})
+	return issue_order(order, ws)
+
+func get_machine_maintenance_threshold(machine_id: int) -> float:
+	var threshold := get_maintenance_trigger_wear()
+	var order := get_active_order(OperationsConfig.ORDER_EARLY_SERVICE)
+	if order and order.is_active and order.target_id == str(machine_id):
+		return minf(threshold, OperationsConfig.EARLY_WEAR)
+	return threshold
+
 func get_shift_work_hours() -> int:
 	for oid in active_orders:
 		var ord: ExecutiveOrder = active_orders[oid]
@@ -320,4 +342,3 @@ func deserialize(data: Dictionary) -> void:
 		var ord: ExecutiveOrder = ExecutiveOrder.new()
 		ord.deserialize(ord_data)
 		active_orders[ord.id] = ord
-

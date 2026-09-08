@@ -170,6 +170,46 @@ The SILO roadmap is strictly sequenced. Each sprint is gated by automated accept
 - **Deliverables**: Informal power network modeling (`patronage_network.gd`), authoritative favours ledger (`favour.gd`), illicit diversion actions (`illicit_action.gd`), corruption evaluation and audit reconciliation system (`corruption_system.gd`), invariant validation (`corruption_invariants.gd`), and HTML observability console integration (`/api/corruption`, `/api/patronage_network`, `/api/audit_log`, `/api/illicit_trace`).
 - **Acceptance Gate**: Multi-week deterministic scenario modeling mass-conserving resource diversion ($\Delta \text{Mass} = 0$), epistemic ledger discrepancy creation, whistleblower discovery via social graph, institutional sanctions, and audit ledger reconciliation; 100% determinism (`Run A == Run B`); all 830 headless test assertions pass across 21 test suites with 0 failures.
 
+### Sprint 15 — Propaganda, Information & Censorship (Completed)
+- **Hypothesis**: Information operates as an authoritative, simulated resource and political instrument where epistemic divergence emerges naturally from channel access, social graph proximity, trust, and physical witness experience.
+- **Deliverables**: Authoritative information object model (`information_object.gd`), bounded citizen belief state (`citizen_belief.gd`), multi-tier distribution channels (`information_channel.gd`, `information_system.gd`), institutional actions (publish, delay, redact, suppress, leak, deny), invariant validation (`information_invariants.gd`), and HTML observability console integration (`/api/information`, `/api/competing_narratives`, `/api/censorship_log`).
+- **Acceptance Gate**: Divergent beliefs across social networks; censorship does not mutate simulation truth or delete witness memories; corruption whistleblowing generates competing claims; all 888+ headless test assertions pass with 0 failures.
+
+### Sprint 16 — Protest, Strikes, Civil Disobedience & Rebellion (Completed)
+- **Hypothesis**: Political conflict, faction grievances, and divergent beliefs coalesce into physical collective actions (strikes, protests, slowdowns, sabotage) carried out by identified citizens with real economic and infrastructural consequences.
+- **Deliverables**: Authoritative collective action model (`collective_action.gd`), systemic collective action engine (`collective_action_system.gd`), grounded labor withdrawal via `DailyLifeSystem` halting production naturally, targeted physical machinery sabotage degrading component health (`MachineComponent.wear_percent`), dual resolution paths (concessions vs crackdown), invariant validation (`collective_action_invariants.gd`), and observability endpoints (`/api/collective_actions`, `/api/active_strikes`, `/api/sabotage_reports`).
+- **Acceptance Gate**: Striking workers stop scheduled labor halting physical production chains; physical sabotage damages machine components; concessions restore labor while crackdowns spike resentment; 100% determinism (`Run A == Run B`); all 986 headless test assertions pass across 25 test suites with 0 failures.
+
+### Sprint 17 — Crime & Underground Economy (Completed)
+- **Hypothesis**: Systemic crime arises from real motive, opportunity, scarcity, relationships, and institutional conditions, altering physical simulation state (inventories, ledgers, components) without arbitrary meters.
+- **Deliverables**: Authoritative crime model (`crime_incident.gd`), underground economy exchange engine (`underground_economy.gd`), crime execution system (`crime_system.gd`), physical evidence generation (badge logs, CCTV, eyewitnesses, discrepancies), invariant validation (`crime_invariants.gd`), and observability endpoints (`/api/crimes`, `/api/crimes_list`, `/api/black_market`, `/api/crime_trace`).
+- **Acceptance Gate**: Physical item theft and diversion conserve mass ($\Delta \text{Mass} = 0$); physical evidence generated; component vandalism degrades machine state; 100% determinism; all 36 headless assertions pass with 0 failures.
+
+### Sprint 18 — Advanced Policing, Investigation & Justice (Completed)
+- **Hypothesis**: Security operates as a staffed operational institution rather than an omniscient button, where investigations depend on physical evidence availability governed by IT policies, and arrests physically withdraw labor.
+- **Deliverables**: Authoritative case model (`security_case.gd`), operational security system (`security_system.gd`), IT CCTV/badge access integration, cell detention in security posts, physical labor withdrawal, sentencing and release, wrongful conviction resentment feedback, invariant validation (`security_invariants.gd`), and observability endpoints (`/api/security_cases`, `/api/security_summary`, `/api/detainees`).
+- **Acceptance Gate**: IT surveillance access controls materially alter investigative outcomes; detained suspects withdraw labor from production lines; sentences expire and release prisoners; wrongful convictions generate resentment; all 26 headless assertions pass with 0 failures.
+
+### Sprint 19 — Psychology, Stress & Adaptation (Completed)
+- **Hypothesis**: Citizens maintain persistent internal psychological states driven by lived bodily and environmental conditions, driving concrete behavioral consequences (absenteeism, operator fatigue errors) without synthetic global morale modifiers.
+- **Deliverables**: Bounded psychological state on `Person` (`stress`, `fatigue`, `morale`, `burnout`, `absent_from_work`), grounded psychological system (`psychology_system.gd`), emergent worker absenteeism withdrawing scheduled labor via `DailyLifeSystem`, fatigue-induced machinery wear jitter, recreation restoration, invariant validation (`psychology_invariants.gd`), and observability endpoints (`/api/psychology_summary`, `/api/person_psychology`).
+- **Acceptance Gate**: Cohort divergence under stress/fatigue; emergent absenteeism halts production lines naturally; fatigued operators inflict extra wear on machines; all 19 headless assertions pass with 0 failures.
+
+### Sprint 20 — Relationships, Romance & Household Dynamics (Completed)
+- **Hypothesis**: Interpersonal relationships, romance, partnerships, and household reconfigurations emerge from real daily proximity and social exposure without artificial matching meters.
+- **Deliverables**: Authoritative relationship model (`relationship.gd`), interpersonal system (`relationship_system.gd`), incest taboo enforcement, partnership formation with reciprocal linkage, co-habitation movement, estrangement and household splitting, bereavement grief, invariant validation (`relationship_invariants.gd`), and observability endpoints (`/api/relationships`, `/api/person_relationships`, `/api/household_dynamics`).
+- **Acceptance Gate**: Partnerships form from physical exposure; partners co-habitate; estrangement splits households and spikes stress; bereavement triggers acute grief; all 24 headless assertions pass with 0 failures.
+
+### Sprint 21 — Genetics, Heredity & Population Health (Completed)
+- **Hypothesis**: A closed underground population maintains valid heredity, Mendelian blood types, and emergent inbreeding depression risks derived from actual genealogies without genome simulation.
+- **Deliverables**: Genetic traits on `Person` (`blood_type`, `trait_stamina`, `trait_resilience`, `trait_metabolism`, `congenital_conditions`), deterministic Mendelian inheritance & relatedness service (`genetics_model.gd`), recessive inbreeding risk mechanics, demographics birth integration (`_spawn_birth`), invariant validation (`genetics_invariants.gd`), and observability endpoints (`/api/genetics_summary`, `/api/person_genetics`).
+- **Acceptance Gate**: Mendelian blood type inheritance; accurate relationship coefficient ($r$) calculations; high relatedness generates `congenital_frailty`; strictly acyclic lineages; all 37 headless assertions pass with 0 failures.
+
+### Sprint 22 — Epidemics & Public Health (Completed)
+- **Hypothesis**: Contagious diseases spread through authentic physical contact patterns, and public health interventions (quarantine, school closures) create concrete economic trade-offs via labor withdrawal.
+- **Deliverables**: Authoritative pathogen model (`pathogen.gd`), epidemic system (`epidemic_system.gd`), SEIR disease progression, physical contact transmission (household, workplace, school), clinical healthcare treatment, quarantine and school closure interventions with grounded labor withdrawal, invariant validation (`epidemic_invariants.gd`), and observability endpoints (`/api/epidemic_status`, `/api/clinic_status`).
+- **Acceptance Gate**: Disease propagates along real contact structures; quarantine isolates carriers and halts transmission; symptomatic sickness and school closure mandate worker absenteeism; clinical treatment reduces mortality; all 16 headless assertions pass with 0 failures.
+
 ---
 
 ## Advanced Phases (Sprints 13–45)

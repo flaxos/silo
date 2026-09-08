@@ -18,6 +18,8 @@ const SUITES: Dictionary = {
 		"res://tests/performance/test_tick_performance.gd",
 	],
 	"simulation": [
+		"res://tests/simulation/test_operations_loop.gd",
+		"res://tests/simulation/test_operations_ux_clarity.gd",
 		"res://tests/simulation/test_population_generation.gd",
 		"res://tests/simulation/test_daily_life.gd",
 		"res://tests/simulation/test_spatial_travel.gd",
@@ -30,6 +32,14 @@ const SUITES: Dictionary = {
 		"res://tests/simulation/test_political_identity.gd",
 		"res://tests/simulation/test_factions_and_blocs.gd",
 		"res://tests/simulation/test_corruption_and_patronage.gd",
+		"res://tests/simulation/test_information_and_propaganda.gd",
+		"res://tests/simulation/test_collective_action_and_rebellion.gd",
+		"res://tests/simulation/test_crime_and_underground_economy.gd",
+		"res://tests/simulation/test_policing_and_justice.gd",
+		"res://tests/simulation/test_psychology_and_stress.gd",
+		"res://tests/simulation/test_relationships_and_household_dynamics.gd",
+		"res://tests/simulation/test_genetics_and_heredity.gd",
+		"res://tests/simulation/test_epidemics_and_public_health.gd",
 	],
 	"presentation": [
 		"res://tests/presentation/test_simulation_viewer.gd",

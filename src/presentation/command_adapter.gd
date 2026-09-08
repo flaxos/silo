@@ -2,6 +2,11 @@
 class_name CommandAdapter
 extends RefCounted
 
+static func dispatch_case_action(ws: WorldState, case_id: String, action: String) -> Dictionary:
+	if not ws:
+		return {"ok": false, "message": "No active session."}
+	return OperationsCommands.queue(ws, case_id, action)
+
 ## Decoupled player command dispatcher that routes player decisions through official simulation systems.
 ## Presentation and UI must NEVER mutate simulation data directly; all player actions pass through CommandAdapter.
 

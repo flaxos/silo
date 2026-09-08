@@ -28,6 +28,8 @@ func tick(world_state: Variant) -> void:
 		_rebuild_person_cache(ws)
 		_build_room_spatial_cache(ws)
 	
+	var striking_map: Dictionary = ws.custom_data.get("striking_person_ids", {})
+	
 	for i in range(_cached_person_count):
 		var p: Person = _cached_persons[i]
 		if not p.is_alive:
@@ -191,6 +193,12 @@ func tick(world_state: Variant) -> void:
 				_:
 					desired_activity = Person.ACTIVITY_IDLE
 					desired_room_id = p.home_room_id
+
+		# 2b. Labour withdrawal: striking or absent workers refuse work
+		if desired_activity == Person.ACTIVITY_WORKING and (striking_map.has(p.id) or p.absent_from_work):
+			desired_activity = Person.ACTIVITY_RECREATING if striking_map.has(p.id) else Person.ACTIVITY_SLEEPING
+			var gather_room: int = int(striking_map.get(p.id, 0))
+			desired_room_id = gather_room if gather_room > 0 else p.home_room_id
 
 		# 3. Check if spatial transition is required
 		if p.current_location_id != desired_room_id:

@@ -2,6 +2,8 @@
 class_name PopulationGenerator
 extends RefCounted
 
+const GeneticsModel = preload("res://src/sim/population/genetics_model.gd")
+
 const FIRST_NAMES_FEMALE: Array[String] = [
 	"Elena", "Maya", "Sarah", "Clara", "Nora", "Leah", "Iris", "Eva", "Rosa", "Anna",
 	"Hanna", "Sofia", "Lydia", "Mira", "Vera", "Diana", "Astrid", "Naomi", "Greta", "Freja",
@@ -191,6 +193,10 @@ static func _create_person(world_state: WorldState, first: String, last: String,
 	var birth_tick: int = - total_ticks_lived
 	
 	var person: Person = Person.new(0, first, last, sex, birth_tick)
+	person.blood_type = rng.choice(GeneticsModel.VALID_BLOOD_TYPES)
+	person.trait_stamina = clampf(rng.randf_range(0.8, 1.2), 0.5, 1.5)
+	person.trait_resilience = clampf(rng.randf_range(0.8, 1.2), 0.5, 1.5)
+	person.trait_metabolism = clampf(rng.randf_range(0.8, 1.2), 0.5, 1.5)
 	person.id = world_state.entity_registry.register_entity("person", person)
 	person.update_life_stage(world_state.sim_clock.get_tick())
 	return person

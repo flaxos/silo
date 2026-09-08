@@ -10,6 +10,35 @@ const FactionSystem = preload("res://src/sim/politics/faction_system.gd")
 const FactionInvariants = preload("res://src/sim/politics/faction_invariants.gd")
 const CorruptionSystem = preload("res://src/sim/politics/corruption_system.gd")
 const CorruptionInvariants = preload("res://src/sim/politics/corruption_invariants.gd")
+const InformationSystem = preload("res://src/sim/politics/information_system.gd")
+const InformationInvariants = preload("res://src/sim/politics/information_invariants.gd")
+const InformationReader = preload("res://src/presentation/information_reader.gd")
+const CollectiveActionSystem = preload("res://src/sim/politics/collective_action_system.gd")
+const CollectiveActionInvariants = preload("res://src/sim/politics/collective_action_invariants.gd")
+const CollectiveActionReader = preload("res://src/presentation/collective_action_reader.gd")
+const CrimeSystem = preload("res://src/sim/law/crime_system.gd")
+const CrimeInvariants = preload("res://src/sim/law/crime_invariants.gd")
+const CrimeReader = preload("res://src/presentation/crime_reader.gd")
+const SecuritySystem = preload("res://src/sim/law/security_system.gd")
+const SecurityInvariants = preload("res://src/sim/law/security_invariants.gd")
+const SecurityReader = preload("res://src/presentation/security_reader.gd")
+const PsychologySystem = preload("res://src/sim/population/psychology_system.gd")
+const PsychologyInvariants = preload("res://src/sim/population/psychology_invariants.gd")
+const PsychologyReader = preload("res://src/presentation/psychology_reader.gd")
+const RelationshipSystem = preload("res://src/sim/population/relationship_system.gd")
+const RelationshipInvariants = preload("res://src/sim/population/relationship_invariants.gd")
+const RelationshipReader = preload("res://src/presentation/relationship_reader.gd")
+const GeneticsModel = preload("res://src/sim/population/genetics_model.gd")
+const GeneticsInvariants = preload("res://src/sim/population/genetics_invariants.gd")
+const GeneticsReader = preload("res://src/presentation/genetics_reader.gd")
+const EpidemicSystem = preload("res://src/sim/health/epidemic_system.gd")
+const EpidemicInvariants = preload("res://src/sim/health/epidemic_invariants.gd")
+const HealthReader = preload("res://src/presentation/health_reader.gd")
+const OperationsSystem = preload("res://src/sim/operations/operations_system.gd")
+const OperationsSession = preload("res://src/sim/operations/operations_session.gd")
+const OperationsConfig = preload("res://src/sim/operations/operations_config.gd")
+const CaseReader = preload("res://src/presentation/case_reader.gd")
+const CommandAdapter = preload("res://src/presentation/command_adapter.gd")
 
 var server: TCPServer
 var port: int = DEFAULT_PORT
@@ -20,13 +49,23 @@ var inst_sys: InstitutionSystem
 var pol_sys: PoliticalSystem
 var fact_sys: FactionSystem
 var corr_sys: CorruptionSystem
+var info_sys: InformationSystem
+var action_sys: CollectiveActionSystem
+var crime_sys: CrimeSystem
+var sec_sys: SecuritySystem
+var psych_sys: PsychologySystem
+var rel_sys: RelationshipSystem
+var epi_sys: EpidemicSystem
 var daily_life: DailyLifeSystem
 var prod_sys: ProductionSystem
 var maint_sys: MaintenanceSystem
 var water_sys: WaterSystem
 var inc_sys: IncidentSystem
+var ops_sys: OperationsSystem
 
 # Runtime controls
+var auto_pause_on_case: bool = true
+var operations_seen_next_id: int = 0
 var is_running: bool = false
 var ticks_per_step: int = 1
 var step_interval_sec: float = 0.5
@@ -103,31 +142,39 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	population_size = pop_size
 	sim_seed = seed_val
 	
-	engine = SimulationEngine.new(sim_seed)
+	engine = OperationsSession.create(population_size, sim_seed)
 	ws = engine.get_world_state()
 	
-	PopulationGenerator.generate_population(ws, population_size)
-	OccupationAssignment.setup_workplaces_and_assignments(ws)
-	
-	inst_sys = InstitutionSystem.new()
 	pol_sys = PoliticalSystem.new()
 	fact_sys = FactionSystem.new()
 	corr_sys = CorruptionSystem.new()
-	daily_life = DailyLifeSystem.new()
-	prod_sys = ProductionSystem.new()
-	maint_sys = MaintenanceSystem.new()
-	water_sys = WaterSystem.new(50000.0, 100000.0)
-	inc_sys = IncidentSystem.new()
+	action_sys = CollectiveActionSystem.new()
+	crime_sys = CrimeSystem.new()
+	sec_sys = SecuritySystem.new()
+	psych_sys = PsychologySystem.new()
+	rel_sys = RelationshipSystem.new()
+	epi_sys = EpidemicSystem.new()
 	
-	engine.register_system(inst_sys)
 	engine.register_system(pol_sys)
 	engine.register_system(fact_sys)
 	engine.register_system(corr_sys)
-	engine.register_system(daily_life)
-	engine.register_system(maint_sys)
-	engine.register_system(prod_sys)
-	engine.register_system(water_sys)
-	engine.register_system(inc_sys)
+	engine.register_system(action_sys)
+	engine.register_system(crime_sys)
+	engine.register_system(sec_sys)
+	engine.register_system(psych_sys)
+	engine.register_system(rel_sys)
+	engine.register_system(epi_sys)
+	
+	inst_sys = ws.custom_data.get("institution_system")
+	info_sys = ws.custom_data.get("information_system")
+	daily_life = ws.custom_data.get("daily_life_system")
+	maint_sys = ws.custom_data.get("maintenance_system")
+	prod_sys = ws.custom_data.get("production_system")
+	water_sys = ws.custom_data.get("water_system")
+	inc_sys = ws.custom_data.get("incident_system")
+	ops_sys = ws.custom_data.get("operations_system")
+	if ops_sys:
+		operations_seen_next_id = ops_sys.next_id
 
 func _process(delta: float) -> bool:
 	if not server:
@@ -139,6 +186,11 @@ func _process(delta: float) -> bool:
 		if time_since_last_step >= step_interval_sec:
 			time_since_last_step = 0.0
 			engine.step(ticks_per_step)
+			if auto_pause_on_case and ws.custom_data.has("operations_system"):
+				var ops := ws.custom_data.get("operations_system") as OperationsSystem
+				if ops and ops.next_id > operations_seen_next_id:
+					is_running = false
+					operations_seen_next_id = ops.next_id
 			
 	# Accept incoming TCP connections
 	while server.is_connection_available():
@@ -261,6 +313,58 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 	var status_code: int = 200
 	
 	match [method, api_path]:
+		["GET", "/api/operations/brief"]:
+			response_data = CaseReader.brief(ws)
+
+		["GET", "/api/operations/detail"]:
+			var cid: String = str(query_params.get("id", ""))
+			if cid.is_empty():
+				var brief: Dictionary = CaseReader.brief(ws)
+				if brief.active.size() > 0:
+					cid = str(brief.active[0].id)
+			if cid.is_empty():
+				response_data = {}
+			else:
+				response_data = CaseReader.detail(ws, cid)
+
+		["POST", "/api/operations/action"]:
+			var case_id: String = ""
+			var action_id: String = ""
+			if body is Dictionary:
+				case_id = str(body.get("case_id", ""))
+				action_id = str(body.get("action", body.get("action_id", "")))
+			elif query_params.has("case_id") and query_params.has("action"):
+				case_id = str(query_params["case_id"])
+				action_id = str(query_params["action"])
+				
+			if case_id.is_empty() or action_id.is_empty():
+				status_code = 400
+				response_data = {"success": false, "error": "Missing case_id or action"}
+			else:
+				var res: Dictionary = CommandAdapter.dispatch_case_action(ws, case_id, action_id)
+				res["success"] = res.get("ok", false)
+				response_data = res
+
+		["POST", "/api/operations/save"]:
+			var save_path := "/tmp/silo-session.save"
+			if body is Dictionary and body.has("path"):
+				save_path = str(body["path"])
+			var err: Error = OperationsSession.save_file(engine, save_path)
+			response_data = {"success": err == OK, "path": save_path, "error": error_string(err) if err != OK else ""}
+
+		["POST", "/api/operations/load"]:
+			var load_path := "/tmp/silo-session.save"
+			if body is Dictionary and body.has("path"):
+				load_path = str(body["path"])
+			var restored := OperationsSession.load_file(load_path)
+			if not restored:
+				status_code = 400
+				response_data = {"success": false, "error": "Failed to load session"}
+			else:
+				engine = restored
+				ws = engine.get_world_state()
+				response_data = {"success": true, "path": load_path, "current_tick": ws.sim_clock.get_tick()}
+
 		["GET", "/api/overview"]:
 			var snapshot: Dictionary = SimulationReader.get_full_telemetry_snapshot(ws)
 			snapshot["engine"] = {
@@ -270,6 +374,7 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"population_size": population_size,
 				"seed": sim_seed
 			}
+			snapshot["operations"] = CaseReader.brief(ws)
 			response_data = snapshot
 
 		["GET", "/api/spatial"], ["GET", "/api/physical_snapshot"]:
@@ -400,6 +505,78 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 		["GET", "/api/audit_log"]:
 			response_data = SimulationReader.get_audit_log(ws)
 			
+		["GET", "/api/information"]:
+			response_data = InformationReader.get_information_summary(ws)
+			
+		["GET", "/api/competing_narratives"]:
+			var ev_id: String = str(query_params.get("event_id", ""))
+			response_data = InformationReader.get_competing_narratives(ws, ev_id)
+			
+		["GET", "/api/censorship_log"]:
+			response_data = {"censorship_audit_log": InformationReader.get_censorship_log(ws)}
+			
+		["GET", "/api/collective_actions"]:
+			response_data = CollectiveActionReader.get_collective_action_summary(ws)
+			
+		["GET", "/api/active_strikes"]:
+			response_data = {"actions": CollectiveActionReader.get_active_actions(ws)}
+			
+		["GET", "/api/sabotage_reports"]:
+			response_data = {"sabotage_incidents": CollectiveActionReader.get_sabotage_log(ws)}
+			
+		["GET", "/api/crimes"]:
+			response_data = CrimeReader.get_crime_summary(ws)
+			
+		["GET", "/api/crimes_list"]:
+			response_data = {"crimes": CrimeReader.get_all_crimes(ws)}
+			
+		["GET", "/api/black_market"]:
+			response_data = CrimeReader.get_black_market_summary(ws)
+			
+		["GET", "/api/crime_trace"]:
+			var cid: int = int(query_params.get("id", query_params.get("crime_id", 1)))
+			response_data = CrimeReader.get_crime_trace(ws, cid)
+			
+		["GET", "/api/security_cases"]:
+			response_data = {"cases": SecurityReader.get_all_cases(ws)}
+			
+		["GET", "/api/security_summary"]:
+			response_data = SecurityReader.get_security_summary(ws)
+			
+		["GET", "/api/detainees"]:
+			response_data = {"detainees": SecurityReader.get_detainees(ws)}
+			
+		["GET", "/api/psychology_summary"]:
+			response_data = PsychologyReader.get_population_psychology_summary(ws)
+			
+		["GET", "/api/person_psychology"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = PsychologyReader.get_person_psychology(ws, pid)
+			
+		["GET", "/api/relationships"]:
+			response_data = RelationshipReader.get_relationships_summary(ws)
+			
+		["GET", "/api/person_relationships"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = {"relationships": RelationshipReader.get_person_relationships(ws, pid)}
+			
+		["GET", "/api/household_dynamics"]:
+			var hhid: int = int(query_params.get("id", 1))
+			response_data = RelationshipReader.get_household_dynamics(ws, hhid)
+			
+		["GET", "/api/genetics_summary"]:
+			response_data = GeneticsReader.get_population_genetics_summary(ws)
+			
+		["GET", "/api/person_genetics"]:
+			var pid: int = int(query_params.get("id", 1))
+			response_data = GeneticsReader.get_person_genetics(ws, pid)
+			
+		["GET", "/api/epidemic_status"]:
+			response_data = HealthReader.get_epidemic_summary(ws)
+			
+		["GET", "/api/clinic_status"]:
+			response_data = HealthReader.get_clinic_summary(ws)
+			
 		["GET", "/api/illicit_trace"]:
 			var aid: int = int(query_params.get("id", query_params.get("action_id", 0)))
 			if aid <= 0:
@@ -462,10 +639,18 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 			var pol_val: Dictionary = PoliticalInvariants.validate_all(ws)
 			var fact_val: Dictionary = FactionInvariants.validate_all(ws)
 			var corr_val: Dictionary = CorruptionInvariants.validate_all(ws)
+			var info_val: Dictionary = InformationInvariants.validate_all(ws)
+			var action_val: Dictionary = CollectiveActionInvariants.validate_all(ws)
+			var crime_val: Dictionary = CrimeInvariants.validate_all(ws)
+			var sec_val: Dictionary = SecurityInvariants.validate_all(ws)
+			var psych_val: Dictionary = PsychologyInvariants.validate_all(ws)
+			var rel_val: Dictionary = RelationshipInvariants.validate_all(ws)
+			var gen_val: Dictionary = GeneticsInvariants.validate_all(ws)
+			var epi_val: Dictionary = EpidemicInvariants.validate_all(ws)
 			var econ_sum: Dictionary = SimulationReader.get_economy_summary(ws)
 			var mach_sum: Dictionary = SimulationReader.get_machinery_summary(ws)
 			
-			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
+			var all_ok: bool = pop_val.get("is_valid", true) and pol_val.get("is_valid", true) and fact_val.get("is_valid", true) and corr_val.get("is_valid", true) and info_val.get("is_valid", true) and action_val.get("is_valid", true) and crime_val.get("is_valid", true) and sec_val.get("is_valid", true) and psych_val.get("is_valid", true) and rel_val.get("is_valid", true) and gen_val.get("is_valid", true) and epi_val.get("is_valid", true) and econ_sum["mass_balance_error_kg"] < 0.001
 			response_data = {
 				"is_valid": all_ok,
 				"checksum": ws.get_state_checksum(),
@@ -473,6 +658,14 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"political_validation": pol_val,
 				"faction_validation": fact_val,
 				"corruption_validation": corr_val,
+				"information_validation": info_val,
+				"collective_action_validation": action_val,
+				"crime_validation": crime_val,
+				"security_validation": sec_val,
+				"psychology_validation": psych_val,
+				"relationship_validation": rel_val,
+				"genetics_validation": gen_val,
+				"epidemic_validation": epi_val,
 				"mass_balance": {
 					"total_mass_kg": econ_sum["total_system_mass_kg"],
 					"seam_ore_kg": econ_sum["seam_ore_kg"],
@@ -520,7 +713,8 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"current_tick": ws.sim_clock.get_tick(),
 				"formatted_time": ws.sim_clock.get_formatted_time(),
 				"checksum": ws.get_state_checksum(),
-				"benchmark": last_benchmark_result
+				"benchmark": last_benchmark_result,
+				"operations_brief": CaseReader.brief(ws)
 			}
 			
 		["POST", "/api/pause"]:

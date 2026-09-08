@@ -102,3 +102,12 @@ This document defines the core domain entities, data schemas, and domain invaria
    - Transitions between distant rooms must pass through transition states with realistic travel ticks.
 6. **No Magic Repairs**:
    - Machine component wear cannot decrease without a maintenance task containing worker labor, time, required tool, and matching replacement component.
+
+
+## Operations case workflow (V0.1)
+
+An operations case is a simulation-owned dictionary in `OperationsSystem.cases`, not a replacement `Incident` or `SecurityCase`. It contains a stable `OP-xxxx` episode ID, namespaced source key (`pump:<entity_id>` or `information:<info_id>`), source ID, affected room ID, detection tick, severity, status, pending action, bounded decision/consequence history, real incident IDs where applicable and the latest observed outcome.
+
+States are NEW, ACTIVE, MONITORING, ESCALATING, STABILISED, RESOLVED and FAILED. Physical recovery requires wear below the recovery bound, nominal running output and three confirmation ticks. Information resolution requires actual recipient delivery. Missing/unavailable source state fails honestly. Terminal cases cannot be reopened by a click; a new physical episode receives a new ID.
+
+At most one unresolved case exists per source signature. At most 16 case commands may be queued, with one pending command per case. Case selection is not an acknowledgement write. Known/suspected/unknown fields are read projections; hidden information truth and private beliefs are not exposed as IT knowledge.

@@ -4,6 +4,7 @@ extends RefCounted
 
 const OpinionMemory = preload("res://src/sim/politics/opinion_memory.gd")
 const PoliticalEvent = preload("res://src/sim/politics/political_event.gd")
+const CitizenBelief = preload("res://src/sim/politics/citizen_belief.gd")
 
 const SEX_FEMALE: int = 0
 const SEX_MALE: int = 1
@@ -90,6 +91,35 @@ var sympathiser_faction_id: int = 0
 
 var opinion_memories: Array[Dictionary] = []
 
+# Information & Belief State (Sprint 15)
+var beliefs: Dictionary = {} # event_id (String) -> CitizenBelief
+
+# Psychological & Stress State (Sprint 19)
+var stress: float = 20.0       # 0.0 to 100.0
+var fatigue: float = 10.0      # 0.0 to 100.0
+var morale: float = 70.0       # 0.0 to 100.0
+var burnout: float = 0.0       # 0.0 to 100.0
+var absent_from_work: bool = false
+
+const INFECTION_SUSCEPTIBLE: int = 0
+const INFECTION_EXPOSED: int = 1
+const INFECTION_INFECTIOUS: int = 2
+const INFECTION_SYMPTOMATIC: int = 3
+const INFECTION_RECOVERED: int = 4
+
+# Genetic and hereditary traits (Sprint 21)
+var blood_type: String = "O+"
+var trait_stamina: float = 1.0       # 0.5 to 1.5
+var trait_resilience: float = 1.0    # 0.5 to 1.5
+var trait_metabolism: float = 1.0    # 0.5 to 1.5
+var congenital_conditions: Array[String] = []
+
+# Epidemic and health state (Sprint 22)
+var infection_stage: int = INFECTION_SUSCEPTIBLE
+var infection_tick: int = -1
+var pathogen_id: String = ""
+var is_quarantined: bool = false
+
 func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int = SEX_FEMALE, p_birth_tick: int = 0) -> void:
 	id = p_id
 	first_name = p_first
@@ -111,6 +141,20 @@ func _init(p_id: int = 0, p_first: String = "", p_last: String = "", p_sex: int 
 	seniority_level = 0
 	faction_id = 0
 	sympathiser_faction_id = 0
+	stress = 20.0
+	fatigue = 10.0
+	morale = 70.0
+	burnout = 0.0
+	absent_from_work = false
+	blood_type = "O+"
+	trait_stamina = 1.0
+	trait_resilience = 1.0
+	trait_metabolism = 1.0
+	congenital_conditions = []
+	infection_stage = INFECTION_SUSCEPTIBLE
+	infection_tick = -1
+	pathogen_id = ""
+	is_quarantined = false
 	
 	occupation_id = "unassigned"
 	department_id = ""
@@ -366,9 +410,13 @@ func recalculate_political_attitudes(current_tick: int) -> void:
 			PoliticalEvent.EVENT_COERCIVE_ORDER:
 				delta_trust += imp * 0.4
 				delta_fairness += imp * 0.3
+				delta_resentment -= imp * 0.5
 			PoliticalEvent.EVENT_CRISIS_RESOLVED:
 				delta_security += imp * 0.4
 				delta_lead += imp * 0.3
+				delta_trust += imp * 0.4
+				delta_fairness += imp * 0.4
+				delta_resentment -= imp * 0.3
 			PoliticalEvent.EVENT_CORRUPTION_DISCOVERED:
 				delta_trust += imp * 0.5 # imp is negative
 				delta_fairness += imp * 0.5
@@ -396,11 +444,30 @@ func recalculate_political_attitudes(current_tick: int) -> void:
 	confidence_security = clampf(base_sec + delta_sec, 0.0, 1.0)
 	confidence_engineering = clampf(base_eng + delta_eng, 0.0, 1.0)
 
+func record_belief(event_id: String, belief: CitizenBelief) -> void:
+	beliefs[event_id] = belief
+
+func get_belief(event_id: String) -> CitizenBelief:
+	return beliefs.get(event_id, null) as CitizenBelief
+
+func has_belief(event_id: String) -> bool:
+	return beliefs.has(event_id)
+
+func record_direct_experience(event_id: String, topic: String, truth: Dictionary) -> void:
+	var b: CitizenBelief = CitizenBelief.new(event_id, topic, true, truth)
+	beliefs[event_id] = b
+
 func serialize() -> Dictionary:
 	var memories_data: Array[Dictionary] = []
 	for m in opinion_memories:
 		memories_data.append(m.duplicate())
 		
+	var beliefs_data: Dictionary = {}
+	for k in beliefs.keys():
+		var b: CitizenBelief = beliefs[k] as CitizenBelief
+		if b:
+			beliefs_data[k] = b.serialize()
+
 	return {
 		"id": id,
 		"first_name": first_name,
@@ -450,7 +517,22 @@ func serialize() -> Dictionary:
 		"preference_hierarchy": preference_hierarchy,
 		"faction_id": faction_id,
 		"sympathiser_faction_id": sympathiser_faction_id,
-		"opinion_memories": memories_data
+		"stress": stress,
+		"fatigue": fatigue,
+		"morale": morale,
+		"burnout": burnout,
+		"absent_from_work": absent_from_work,
+		"blood_type": blood_type,
+		"trait_stamina": trait_stamina,
+		"trait_resilience": trait_resilience,
+		"trait_metabolism": trait_metabolism,
+		"congenital_conditions": congenital_conditions.duplicate(),
+		"infection_stage": infection_stage,
+		"infection_tick": infection_tick,
+		"pathogen_id": pathogen_id,
+		"is_quarantined": is_quarantined,
+		"opinion_memories": memories_data,
+		"beliefs": beliefs_data
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -512,8 +594,33 @@ func deserialize(data: Dictionary) -> void:
 	preference_hierarchy = float(data.get("preference_hierarchy", 0.5))
 	faction_id = int(data.get("faction_id", 0))
 	sympathiser_faction_id = int(data.get("sympathiser_faction_id", 0))
+	stress = float(data.get("stress", 20.0))
+	fatigue = float(data.get("fatigue", 10.0))
+	morale = float(data.get("morale", 70.0))
+	burnout = float(data.get("burnout", 0.0))
+	absent_from_work = bool(data.get("absent_from_work", false))
+	blood_type = str(data.get("blood_type", "O+"))
+	trait_stamina = float(data.get("trait_stamina", 1.0))
+	trait_resilience = float(data.get("trait_resilience", 1.0))
+	trait_metabolism = float(data.get("trait_metabolism", 1.0))
+	congenital_conditions = []
+	for c in data.get("congenital_conditions", []):
+		congenital_conditions.append(str(c))
+	infection_stage = int(data.get("infection_stage", INFECTION_SUSCEPTIBLE))
+	infection_tick = int(data.get("infection_tick", -1))
+	pathogen_id = str(data.get("pathogen_id", ""))
+	is_quarantined = bool(data.get("is_quarantined", false))
 	
 	opinion_memories = []
 	for m in data.get("opinion_memories", []):
 		if m is Dictionary:
 			opinion_memories.append(m.duplicate())
+			
+	beliefs = {}
+	var b_data: Dictionary = data.get("beliefs", {})
+	for k in b_data.keys():
+		var b_dict: Dictionary = b_data[k] as Dictionary
+		if b_dict:
+			var cb: CitizenBelief = CitizenBelief.new()
+			cb.deserialize(b_dict)
+			beliefs[k] = cb

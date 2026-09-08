@@ -526,4 +526,329 @@ Following user playtesting and feedback on the physical presentation slice:
 - Retains high GPU framerate (58+ FPS) via batched single-pass vector drawing.
 - 100% test pass rate across all headless regression test suites (888/888 assertions).
 
+---
 
+## ADR-020: Information, Propaganda, Censorship & Epistemic Divergence (Sprint 15)
+
+### Context
+A realistic post-disaster underground society cannot rely on perfect, omnipresent knowledge. Information dissemination is inherently physical, institutional, and social:
+1. Physical events occur authoritatively in `WorldState` (e.g. pipe ruptures, resource shortages, illicit diversion).
+2. The administration communicates via official broadcast channels, bulletin boards, and workplace announcements, often redacting, delaying, or denying incidents.
+3. Citizens hold bounded mental models (`CitizenBelief`), where eyewitnesses retain unshakeable confidence in direct experience while non-witnesses evaluate claims based on source credibility, institutional trust, and social network ties.
+4. Suppressing an announcement must never delete simulation truth or rewrite witness memories.
+
+### Decision
+1. **Authoritative Information Model (`InformationObject`)**:
+   - Represents announcements, notices, leaks, or rumors.
+   - Preserves `truth_basis` (immutable dictionary of physical facts) alongside `claim` (the asserted framing, which may omit, spin, or fabricate facts).
+   - Lifecycle states: `ACTIVE`, `DELAYED`, `REDACTED`, `SUPPRESSED`, `DENIED`.
+2. **Bounded Citizen Belief Model (`CitizenBelief`)**:
+   - Stored per citizen as `person.beliefs[event_id]`.
+   - Tracks `has_direct_experience`, `known_truth`, `believed_claim`, `confidence`, and `doubt`.
+   - Bounded by `MAX_HEARD_CLAIMS = 5` to ensure permanent memory bounds and interactive 1,200-resident performance.
+3. **Censorship != Deletion Invariant**:
+   - Calling `suppress_information()` halts broadcast delivery over official channels, but leaves `truth_basis`, inventory mass balances, and witness memories intact.
+4. **Cognitive Divergence & Eyewitness Propaganda Detection**:
+   - When an eyewitness (`has_direct_experience == true`) receives a contradictory official denial, their confidence in their own truth remains 1.0, skepticism towards the administration surges, and institutional trust drops.
+   - When conflicting claims are heard by non-witnesses, ideological alignment (faction ties) and social network trust dictate adoption.
+5. **Word-of-Mouth Network Propagation (`SocialGraph`)**:
+   - Convinced citizens and witnesses spread claims along coworker and household edges during shift handovers, reinforcing belief conviction.
+6. **Observability & Invariants**:
+   - `InformationInvariants` validates ID monotonicity, truth preservation, bounded memory, and deterministic replay (`Run A == Run B`).
+   - `InformationReader` exposes read models for information objects, citizen beliefs, competing narratives, and censorship logs.
+
+### Consequences
+- True epistemic divergence: factions and social classes form differing beliefs about the same physical silo reality.
+- Headless verification: 64 new assertions passing with zero test regressions and 100% determinism.
+
+---
+
+## ADR-021: Collective Resistance, Strikes, Sabotage & Industrial Feedback (Sprint 16)
+
+### Status
+Accepted
+
+### Context
+Political tension, class resentment, and epistemic divergence must have material consequences. In authoritarian underground societies, suppressed grievances manifest not in abstract "rebellion meters", but through physical withdrawal of labor (strikes, slowdowns), public demonstrations (pickets, protests), and targeted physical attacks (machinery sabotage). These actions must involve real, identified citizens and cause downstream economic and infrastructural effects through physical simulation laws rather than artificial modifiers.
+
+### Decision
+1. **Authoritative Collective Action Model (`CollectiveAction`)**:
+   - Types: `STRIKE`, `PROTEST`, `SLOWDOWN`, `SABOTAGE`, `CIVIL_DISOBEDIENCE`.
+   - Identified actors: designated `organizer_person_id` and explicit list of `participant_ids`. No anonymous crowd units or abstract numbers.
+   - Grounded targets: target `workplace_room_id`, target `machine_id` + `component_id`, or policy grievances.
+   - Lifecycle states: `PLANNED`, `ACTIVE`, `CONCEDED`, `SUPPRESSED`, `COLLAPSED`.
+2. **Grounded Labor Withdrawal (`CollectiveActionSystem` & `DailyLifeSystem`)**:
+   - `CollectiveActionSystem` (`execution_order = 39`) tracks active strikes and maintains `ws.custom_data["striking_person_ids"]`.
+   - `DailyLifeSystem` intercepts scheduled work shifts for striking citizens, replacing work with picketing/protest activity.
+   - Because `ProductionSystem` strictly requires physical worker presence at the workplace room, resource extraction (such as geological seam mining) and downstream processing automatically stop completely without synthetic modifiers.
+3. **Physical Machinery Sabotage**:
+   - Saboteurs inflict direct wear on real `MachineComponent` records (`comp.wear_percent += severity`), directly degrading machine operating states (`STATE_NOMINAL -> STATE_FAULT`) and cutting physical throughput (e.g. water pumping rate).
+4. **Information Loop Integration**:
+   - Whistleblower leaks and exposed corruption from Sprint 15 trigger collective action; institutional censorship and suppression delay or prevent collective awareness.
+5. **Dual Resolution Paths**:
+   - `grant_concessions()`: Accepts worker demands, returns labor to workplaces, boosts institutional trust, and de-escalates class resentment.
+   - `enforce_crackdown()`: Disperses action by force, breaks the strike, returns workers under duress, but severely degrades institutional trust and spikes resentment, laying the ground for future radicalization.
+6. **Invariants & Observability**:
+   - `CollectiveActionInvariants` validates entity presence, participant identification, target validity, and deterministic state hashing (`Run A == Run B`).
+   - `CollectiveActionReader` provides read-only models for active strikes, affected workplaces, and sabotage logs. Observer server exposes `/api/collective_actions`, `/api/active_strikes`, and `/api/sabotage_reports`.
+
+### Consequences
+- True bottom-up political friction: economic disruption emerges directly from human labor withdrawal and physical machine faults.
+- Complete determinism and headless test coverage (34 assertions, 0 failures).
+- Seamless continuation into Phase B (Law, Crime, Justice & Human Behavior).
+
+---
+
+## ADR-022: Systemic Crime, Physical Evidence Trails & Underground Economy (Sprint 17)
+
+### Status
+Accepted
+
+### Context
+Rather than incrementing an abstract crime meter (`crime += 10`), crime must arise from concrete motives (material scarcity, grievance, greed), opportunities (room clearance, unmonitored off-shift hours, lack of security presence), and real relationships. A crime must physically alter simulation state (diverting inventories, altering ledgers, causing component breakdown) and leave grounded physical evidence (badge swipe logs, CCTV records, eyewitness observations, physical item discrepancies).
+
+### Decision
+1. **Authoritative Crime Model (`CrimeIncident` in `src/sim/law/crime_incident.gd`)**:
+   - Offence types: `TYPE_THEFT`, `TYPE_INVENTORY_DIVERSION`, `TYPE_CONTRABAND`, `TYPE_VANDALISM`, `TYPE_RECORD_MANIPULATION`, `TYPE_UNAUTHORISED_ACCESS`.
+   - Explicit bounded references: `perpetrator_id`, `victim_id`, `location_room_id`, `target_machine_id`, `target_component_id`, `item_type`, `item_quantity`, `motive`, `concealment`.
+   - Physical evidence trail: `evidence_badge_log`, `evidence_cctv`, `evidence_witnesses`, `evidence_inventory_discrepancy`, `physical_trace`.
+2. **Underground Economy & Illicit Trade (`UndergroundEconomy` in `src/sim/law/underground_economy.gd`)**:
+   - Direct person-to-person and room-to-person exchange of diverted goods with strict conservation of mass ($\Delta \text{Mass} = 0$).
+   - Risk-adjusted pricing based on enforcement pressure and scarcity.
+3. **Physical Theft & Component Vandalism (`CrimeSystem` in `src/sim/law/crime_system.gd`, `execution_order = 41`)**:
+   - Off-shift or opportunistic thieves physically transfer kilograms of items from room/facility inventories into citizen personal possessions.
+   - Vandalism directly degrades target machine components (`comp.wear_percent += severity`), triggering real operational degradation.
+4. **Physical Invariants & Observability (`CrimeInvariants`, `CrimeReader`)**:
+   - Validates entity existence, mass conservation, and physical evidence validity. Observer REST endpoints: `/api/crimes`, `/api/crimes_list`, `/api/black_market`, `/api/crime_trace`.
+
+### Consequences
+- True material consequences for crime without synthetic modifiers; mass conservation strictly preserved.
+- Physical evidence trails generated organically for investigative systems.
+- Complete determinism and headless test coverage (36 assertions, 0 failures).
+
+---
+
+## ADR-023: Operational Security, Investigative Justice & Institutional Detention (Sprint 18)
+
+### Status
+Accepted
+
+### Context
+Security cannot be an omniscient magic wand or instant button. Security personnel are real citizens assigned to real posts (`Room.TYPE_SECURITY_POST`), operating on shifts. Deploying an officer removes them from other productive work. Investigations must gather actual evidence generated by crimes, where IT policies (CCTV data retention, badge logs) directly dictate whether evidence is available or lost. Adjudication can result in correct convictions or wrongful convictions, with real systemic consequences.
+
+### Decision
+1. **Authoritative Case Lifecycle (`SecurityCase` in `src/sim/law/security_case.gd`)**:
+   - States: `STATUS_OPEN`, `STATUS_INVESTIGATING`, `STATUS_WARRANT`, `STATUS_ARRESTED`, `STATUS_CONVICTED`, `STATUS_CLOSED_UNSOLVED`.
+   - Dynamic suspect scoring based on physical proximity, badge logs, witness IDs, and CCTV records.
+   - Verdicts: `VERDICT_NONE`, `VERDICT_GUILTY_CORRECT`, `VERDICT_WRONGFUL_CONVICTION`, `VERDICT_ACQUITTED`.
+2. **IT Surveillance & Data Retention Integration**:
+   - When IT access is granted (`ws.custom_data["it_access_granted"] == true`) and logs are retained, security detectives retrieve CCTV and electronic badge logs.
+   - When IT access is revoked or log retention window expires, electronic evidence is unavailable, forcing security to rely on eyewitnesses or risk wrongful conviction.
+3. **Grounded Detention & Physical Labor Withdrawal (`SecuritySystem` in `src/sim/law/security_system.gd`, `execution_order = 42`)**:
+   - Convicted or arrested suspects are physically moved to a security post/cell room (`Room.TYPE_SECURITY_POST`).
+   - While detained, the suspect's labor is completely withdrawn from their workplace (`DailyLifeSystem` and `ProductionSystem` detect cell location), halting output without artificial modifiers.
+   - Sentences are tracked in ticks; when expired, prisoners are released and reinstated into normal routines.
+4. **Wrongful Conviction Systemic Feedback**:
+   - Wrongful convictions spike citizen resentment and degrade institutional trust among the victim's household and coworkers.
+5. **Invariants & Telemetry (`SecurityInvariants`, `SecurityReader`)**:
+   - Strict bounds on cases, officer assignments, and detainee statuses. Endpoints: `/api/security_cases`, `/api/security_summary`, `/api/detainees`.
+
+### Consequences
+- Policing is fully physicalised: officers are real workers, detention physically deprives industry of labor.
+- IT policy decisions materially alter investigative outcomes.
+- Complete determinism and headless test coverage (26 assertions, 0 failures).
+
+---
+
+## ADR-024: Human Psychology, Fatigue, Absenteeism & Human Adaptation (Sprint 19)
+
+### Status
+Accepted
+
+### Context
+Citizens are not robots. Prolonged shifts, physical deprivation, dangerous work, and lack of sleep accumulate fatigue, stress, and burnout. Psychology cannot rely on arbitrary global morale modifiers; it must arise from real bodily and environmental conditions, and lead to concrete simulation consequences such as workplace absenteeism, elevated accident rates, and machinery wear.
+
+### Decision
+1. **Bounded Psychological State on `Person` (`src/sim/population/person.gd`)**:
+   - Variables: `stress` [0, 100], `fatigue` [0, 100], `morale` [0, 100], `burnout` [0, 100], `absent_from_work` (bool).
+   - Full JSON serialization and deserialization support.
+2. **Grounded Psychological Dynamics (`PsychologySystem` in `src/sim/population/psychology_system.gd`, `execution_order = 43`)**:
+   - Sleep restores fatigue (`-1.2` / tick) and lowers stress (`-0.3` / tick).
+   - Working shifts increases fatigue (`+1.0` / tick) and stress. Dangerous jobs (mining, heavy machining) generate higher stress and fatigue.
+   - Dehydration (`hydration_percent < 50`) and economic deprivation severely spike stress.
+   - Chronic high stress + high fatigue gradually drives up `burnout`.
+3. **Systemic Consequences**:
+   - **Emergent Absenteeism**: When `burnout > 75` and `fatigue > 60`, workers have an elevated probability of calling in sick/absent (`absent_from_work = true`).
+   - `DailyLifeSystem` checks `p.absent_from_work` and keeps the resident resting at home rather than reporting to the workplace.
+   - Since `ProductionSystem` requires real workers in the room, absenteeism naturally reduces or halts production.
+   - **Fatigue-Induced Machinery Wear**: Fatigued operators (`fatigue > 50`) make operational mistakes, inflicting additional wear jitter on machine components at their workplace.
+   - **Recreation & Social Restoration**: Spending off-shift time in recreation rooms or at home restores morale and reduces stress.
+4. **Invariant Validation & Observability (`PsychologyInvariants`, `PsychologyReader`)**:
+   - Validates [0, 100] bounds for all living residents. Exposes population averages, stress distributions, burnout cohorts, and person-level psychology via `/api/psychology_summary` and `/api/person_psychology`.
+
+### Consequences
+- Human limits directly govern economic throughput through grounded absenteeism and operator error wear.
+- Zero global morale modifiers; individual psychological state directly maps to physical behavior.
+- Complete determinism and headless test coverage (19 assertions, 0 failures).
+
+---
+
+## ADR-025: Interpersonal Relationships, Romance & Dynamic Household Reconfiguration (Sprint 20)
+
+### Status
+Accepted
+
+### Context
+Human social cohesion, romance, partnerships, and household arrangements cannot be modeled by arbitrary matching sliders or detached from physical proximity. Relationships must emerge organically from daily exposure (co-residents, coworkers, school cohorts, neighbours) and influence crucial life outcomes: partnerships, co-habitation, separations, household splitting, emotional wellbeing (morale/stress buffers), and bereavement grief.
+
+### Decision
+1. **Authoritative Relationship Entity (`Relationship` in `src/sim/population/relationship.gd`)**:
+   - Tracks bilateral ties with normalized dimensions: `familiarity`, `affection`, `attraction`, `trust`, `conflict` in [0, 100].
+   - Status states: `STATUS_STRANGER`, `STATUS_ACQUAINTANCE`, `STATUS_FRIEND`, `STATUS_CLOSE_FRIEND`, `STATUS_ROMANTIC_INTEREST`, `STATUS_PARTNER`, `STATUS_ESTRANGED`.
+2. **Grounded Interaction & Romance (`RelationshipSystem`, `execution_order = 44`)**:
+   - Interaction sampling during daily routines (home, workplace, school, recreation).
+   - Incest taboo strictly prohibits romantic attraction or partnership between parent-child or siblings.
+   - High mutual attraction, affection, and familiarity trigger partnership proposals (`STATUS_PARTNER`), setting reciprocal `partner_id`.
+   - Co-habitation moves new partners into a shared household and home room.
+   - Estrangement/divorce (`conflict >= 80`, `affection <= 20`) dissolves partnerships, causing household splitting and emotional stress.
+   - Bereavement: Death of a partner, child, or close friend inflicts severe grief (+35 stress, -45 morale).
+3. **Invariants & Telemetry (`RelationshipInvariants`, `RelationshipReader`)**:
+   - Verifies reciprocal partner validity, incest taboo, bounds [0, 100].
+   - Exposes `/api/relationships`, `/api/person_relationships`, `/api/household_dynamics`.
+
+### Consequences
+- Partnerships and living arrangements emerge from physical and social exposure rather than random pairing.
+- Interpersonal harmony and conflict provide direct emotional buffers or stress penalties.
+- Complete determinism and headless test coverage (24 assertions, 0 failures).
+
+---
+
+## ADR-026: Deterministic Genetics, Heredity & Recessive Inbreeding Risk (Sprint 21)
+
+### Status
+Accepted
+
+### Context
+Multi-generational closed populations require believable heredity and population genetics without unnecessary molecular-scale simulations. Traits must have gameplay consequences, and inbreeding risks must emerge from actual genealogical trees.
+
+### Decision
+1. **Genetic Traits on `Person` (`src/sim/population/person.gd`)**:
+   - Mendelian blood types: `blood_type` in {"O+", "A+", "B+", "AB+", "O-", "A-", "B-", "AB-"}.
+   - Inherited physiological traits: `trait_stamina`, `trait_resilience`, `trait_metabolism` in [0.5, 1.5].
+   - Congenital conditions array (e.g. `congenital_frailty`).
+2. **Mendelian Inheritance & Coefficient of Relationship ($r$) (`GeneticsModel` in `src/sim/population/genetics_model.gd`)**:
+   - Allele sampling for ABO and Rh factors.
+   - Lineage graph traversal calculating exact $r$ ($r=0.5$ parent-child/siblings; $r=0.25$ half-siblings/uncle-niece/grandparents; $r=0.125$ first cousins; $0.0$ unrelated).
+   - Recessive inbreeding depression risk: If $r \ge 0.125$, child has probability of inheriting `congenital_frailty`, lowering baseline health to 85% and impairing stamina.
+3. **Invariants & Telemetry (`GeneticsInvariants`, `GeneticsReader`)**:
+   - Validates valid blood types, trait bounds, acyclic pedigrees, and population genetic diversity.
+   - Exposes `/api/genetics_summary`, `/api/person_genetics`.
+
+### Consequences
+- Multi-generational isolated populations sustain valid genealogies with emergent recessive risks.
+- Parentage is strictly acyclic; traits blend deterministically with parental heritage.
+- Complete determinism and headless test coverage (37 assertions, 0 failures).
+
+---
+
+## ADR-027: Contagious Epidemics, Contact Transmission & Public Health Isolation (Sprint 22)
+
+### Status
+Accepted
+
+### Context
+Disease transmission must emerge from actual physical and social contact structures rather than abstract habitat-wide infection meters. Public health measures (quarantine, school closures, clinical care) must exert concrete systemic trade-offs against labor availability and industrial production.
+
+### Decision
+1. **Authoritative Pathogen & SEIR Model (`Pathogen` in `src/sim/health/pathogen.gd`)**:
+   - States: `INFECTION_SUSCEPTIBLE`, `INFECTION_EXPOSED`, `INFECTION_INFECTIOUS`, `INFECTION_SYMPTOMATIC`, `INFECTION_RECOVERED`.
+   - Physical contact transmission along real edges: household members sharing sleeping quarters, coworkers during active shifts, students in classrooms.
+2. **Grounded Healthcare & Labor Withdrawal (`EpidemicSystem` in `src/sim/health/epidemic_system.gd`, `execution_order = 46`)**:
+   - Symptomatic patients are too sick to work (`absent_from_work = true`), naturally halting industrial lines.
+   - Doctors and nurses in clinic rooms treat admitted patients, reducing mortality by 80% and accelerating recovery.
+   - Quarantine policy (`quarantine_active`): isolates infectious/symptomatic citizens, preventing contact transmission while withdrawing labor.
+   - School closure (`schools_closed`): eliminates classroom transmission, but forces parents to remain home for childcare (`absent_from_work = true`), removing labor from the economy.
+3. **Invariants & Telemetry (`EpidemicInvariants`, `HealthReader`)**:
+   - Strict SEIR conservation ($S + E + I + Sy + R = \text{Living Population}$), non-negative counts, and clinic occupancy metrics.
+   - Exposes `/api/epidemic_status`, `/api/clinic_status`.
+
+### Consequences
+- Contagions spread through genuine physical encounters, creating authentic disease vectors.
+- Public health interventions directly conflict with economic productivity via labor withdrawal.
+- Complete determinism and headless test coverage (16 assertions, 0 failures).
+
+
+
+
+
+
+
+---
+
+## ADR-028: Bounded IT operations workflow and playable session
+
+### Status
+Accepted for integration V0.1, 2026-09-08. Advanced roadmap unchanged; rendered/human acceptance remains pending.
+
+### Context
+The Godot world exposed simulation telemetry but had no recurring player workflow. Existing observer commands had broad administrative power, while the player role is Head of IT. Generic engine loading restored entity dictionaries rather than typed running entities. The integration must provide meaningful actions without adding a new physical or political domain.
+
+### Decision
+Introduce two workflow templates: pump maintenance risk and institutional information review. A post-domain operations system tracks real source conditions, references authoritative incidents, and records player decisions and observed consequences. A case does not itself repair a machine or resolve an incident.
+
+Grant a narrow standing Engineering scheduling delegation in the playable-session bootstrap: IT may reserve one targeted early-service window for 144 ticks at 55% component wear. It lowers eligibility for that machine only. Existing scheduled technicians, replacement stocks and repair labour remain mandatory. Cancellation/expiry restores the normal threshold. Parts and labour consumed earlier, plus the single reserved slot, are the opportunity cost. No conscription, quotas, machine overdrive or magic repair is exposed.
+
+Reuse the existing InformationSystem for public/internal official reports. A small bridge records actual school attendance exceeding declared capacity, with stable source room and observation time. Already exposed audit records can also be bridged; concealed actions are not revealed and corruption generation is not newly activated. Publication, bounded review delay, withholding and monitoring affect existing dissemination/belief processing. Delivery completes the communication workflow, not the reported facility problem.
+
+Queue commands through the existing EventQueue and validate authority and target both when queued and executed. Keep the permissive legacy observer adapter methods as developer tooling. Pure evidence/readers expose only supported causal links, known records and truthful unknowns; no backend uncertainty is fabricated.
+
+Use separate operations and detail UI components. Preserve renderer geometry and all generated room, bed, person, household, workplace and schedule mappings. Initialize the playable pump with physically consistent inherited component age (54.8% bearing wear), without changing degradation rates or injecting future failures.
+
+Provide a version-1 binary session codec limited to this bootstrap, preserving int64 RNG state, integer dictionary keys, typed entities, system state, commands and spatial journeys. Do not redesign generic persistence for every advanced domain during this integration.
+
+### Consequences
+The player can detect, locate, investigate, request/monitor, advance time, and observe real repair or information-delivery outcomes. Tests prove counterfactual differences, conservation, authority, replay and save continuation. The 1,200-resident scene retains coarse labour arithmetic and documented staffing imbalances. Desktop visual/human acceptance must be reported independently of passing headless control automation.
+
+---
+
+## ADR-029: Operations Narrative Presentation Layer, Anti-Magic Disclosures & Labour Crew Capping
+
+### Status
+Accepted (Operations UX Clarity Pass, 2026-09-08).
+
+### Context
+Following verification of the Playable Operations Loop V0.1 baseline:
+1. Operations UI text sounded like engine debug output and raw enums rather than an authentic operational briefing.
+2. Human players need plain-English clarity regarding: what is happening, why, why it matters, who/what is affected, knowns vs. unknowns, IT authority boundaries, and what actions will and will NOT solve.
+3. Information actions (e.g., publishing overcrowding reports) could be misinterpreted by players as physical solutions to facility shortages.
+4. Maintenance labour arithmetic allowed up to 45 technicians working simultaneously to finish complex repairs in a single tick.
+5. The staffing audit identified 1 critical missing role (`security_officer` at Level 7 Security Post) and 8 questionable demographic/occupational distributions.
+
+### Decision
+1. **Human Narrative Formatting Layer (`src/presentation/case_formatter.gd`)**:
+   - Pure presentation translation layer that converts raw machine telemetry and information states into structured operational briefings answering 7 core human questions.
+   - Forbids engine debug jargon, raw enum strings, and abstract modifiers in user-facing text.
+   - Explicitly partitions root physical problems (facility deficits) from official information status (censored vs. delivered).
+   - Clarifies IT authority boundaries (communications, scheduling requests, data analysis) versus outside authority (Engineering maintenance budgets, Board capital construction, education staffing).
+2. **Anti-Magic Action Disclaimers & Trade-Offs**:
+   - Every available action specifies: Why do it, Trade-off, and What it does NOT do.
+   - For information cases: publishing discloses that it does *not* build classrooms or hire teachers.
+   - Added an administrative escalation action (`request_review` issuing `it_school_capacity_review` executive order) allowing IT to formally request facility expansion review without faking municipal construction.
+   - For pump maintenance: early service discloses that it does *not* instantly repair the machine or fabricate spare parts.
+3. **Bounded Workspace Crew Cap (`src/sim/machinery/maintenance_system.gd`)**:
+   - Added `MAX_CREW_PER_MACHINE = 3` constant.
+   - Bounded effective repair labour per tick at `mini(tech_count, MAX_CREW_PER_MACHINE)`.
+   - Eliminates single-tick instant repair anomalies while preserving multi-tick repair progression and physical labour conservation.
+4. **Staffing Audit Resolution**:
+   - Defined `DEPT_SECURITY: String = "security"` and `"security_officer"` in `src/sim/population/occupation.gd`.
+   - Added `"security_officer"` to adult job generator in `src/sim/population/occupation_assignment.gd`.
+   - 27 security officers deterministically generated and assigned to Level 7 Security Post (#2010), matching existing room capacity and leaving 0 unassigned errors.
+5. **Godot UI Viewport Containment**:
+   - Optimized `OperationsPanel` and `CaseDetailPanel` vertical sizing, separations, and minimum heights.
+   - Entire operations sidebar and decision buttons fit comfortably within standard 1440×900 display viewports (panel height bounded at 830px).
+
+### Consequences
+- Human players receive clear, truthful, non-magical briefings of all operational cases.
+- Simulation invariants, mass conservation, and physical dependency chains remain strictly authoritative and unaltered.
+- 100% test passing (1,313 assertions, 33 test suites) and 100% headless UAT passing (19/19 checks, 0 failures).
+- Desktop visual / human gameplay acceptance is explicitly tracked as PENDING on a real display.
