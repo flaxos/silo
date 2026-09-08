@@ -18,6 +18,8 @@ const SUITES: Dictionary = {
 		"res://tests/performance/test_tick_performance.gd",
 	],
 	"simulation": [
+		"res://tests/simulation/test_operations_loop.gd",
+		"res://tests/simulation/test_operations_ux_clarity.gd",
 		"res://tests/simulation/test_population_generation.gd",
 		"res://tests/simulation/test_daily_life.gd",
 		"res://tests/simulation/test_spatial_travel.gd",

@@ -1,7 +1,8 @@
 # CURRENT_SPRINT.md — Active Sprint Tracking
 
 ```
-CURRENT: Sprint 23 — Advanced Spatial Model & Pathfinding (Phase C Planned / Next)
+CURRENT: Integration — Playable Operations Loop V0.1 (IMPLEMENTED; DESKTOP UAT PENDING)
+PAUSED: Sprint 23 — Advanced Spatial Model & Pathfinding (not advanced)
 PREVIOUS: Sprint 22 — Epidemics & Public Health (Completed & Verified)
 PREVIOUS: Sprint 21 — Genetics, Heredity & Population Health (Completed & Verified)
 PREVIOUS: Sprint 20 — Relationships, Romance & Household Dynamics (Completed & Verified)
@@ -19,10 +20,54 @@ PREVIOUS: Sprint 12 — Political Identity & Legitimacy (Completed & Verified)
 
 ---
 
-## 1. Active Sprint: Sprint 23 — Advanced Spatial Model & Pathfinding (PHASE C PLANNED / NEXT)
+## 1. Active Sprint: Playable Operations Loop V0.1
 
-### Goal
-Upgrade the physicalisation layer into simulation-grade spatial movement with formal spatial hierarchies (Silo $\to$ Level $\to$ District $\to$ Zone $\to$ Room) and multi-speed transit queues.
+Authorized integration window: approximately five hours. Advanced roadmap remains paused.
+
+- [x] Inspect actual bootstrap, simulation, authority, physical projection and tests.
+- [x] Define two-template loop: pump maintenance risk and institutional information review.
+- [x] Implement deterministic cases, supported causal evidence and IT command authorization.
+- [x] Integrate compact Godot operations queue, detail, location links and consequence history.
+- [x] Prove water and non-infrastructure information loops.
+- [x] Record targeted population/facility audit.
+- [x] Complete full regression, replay, persistence and 1,200 population checks.
+- [x] Record rendered UAT separately from human gameplay acceptance.
+- [x] Operations UX Clarity & Correctness Pass:
+  - [x] Human narrative presentation layer (`src/presentation/case_formatter.gd`) answering 7 core operational questions.
+  - [x] Plain-English briefings without raw engine enums or debug jargon.
+  - [x] Clear root problem (facility) vs. information status (official report) distinction.
+  - [x] Strict authority separation: IT authority vs. Outside authority.
+  - [x] Action trade-offs and anti-magic disclaimers on every choice.
+  - [x] Staffing audit fix: generated 27 security officers assigned to Level 7 Security Post (0 errors).
+  - [x] Labour crew cap (`MAX_CREW_PER_MACHINE = 3`) eliminating instant-repair bug.
+  - [x] Subsystem performance profiling tool (`tools/profile_slow_ticks.gd`).
+  - [x] Dedicated Directive / Decision Terminal Console: Housed in its own framed tactical OS container (`directive_box: PanelContainer`) with header banner, high-contrast directive choice picker, structured BBCode breakdown (Purpose, Trade-off, ⚠️ Anti-magic boundary), and bold execution trigger.
+  - [x] Top-to-Bottom Vertical Rhythm & Viewport Scaling: Formatted layout into an intuitive flow (Case Identify & Locate → OS Telemetry Vitals Card → Dedicated Directive Console → Deep Dossier / History Tabs → Session Footer) fitting comfortably within the 830px panel limit without cramped controls.
+  - [x] Remote Mobile Web UAT Setup:
+    - Embedded Operations REST API in `tools/observer_server.gd` (`/api/operations/brief`, `/api/operations/detail`, `/api/operations/action`, save/load, auto-pause on case trigger).
+    - Responsive mobile CSS with touch targets >= 44px (`src/viewer/operations.css`).
+    - Mobile Operations Controller with auto-polling, directive dispatch, auto-pause detection, and silo map focus (`src/viewer/operations.js`).
+    - Mobile thumb bottom navigation bar (`#mobile-nav`) in `src/viewer/index.html`.
+    - Game server launcher script (`tools/run_game_server.sh`) with auto-detected LAN (`192.168.20.10`) and ZeroTier (`192.168.193.11`) URLs.
+    - Automated E2E test (`tools/test_mobile_server.py`) passing 36/36 assertions.
+
+### Verified handoff — 2026-09-08 (Remote Mobile UAT Pass)
+
+Full test suite and headless regressions running cleanly. Mobile server automated verification: **36 passed, 0 failed** (`tools/test_mobile_server.py`), verifying:
+- Viewport meta tag and mobile CSS media queries.
+- Responsive `#tab-operations` with dedicated Directive Console, OS Telemetry vitals, and bottom navigation bar (`#mobile-nav`).
+- End-to-end Operations REST API: live case brief, case detail with human plain-English briefing, directive queueing (`request_service`), and tick stepping.
+- Session persistence (`/api/operations/save` and `/api/operations/load`).
+- Server launcher `tools/run_game_server.sh` automatically prints local WiFi (`http://192.168.20.10:8080/`) and ZeroTier (`http://192.168.193.11:8080/`) URLs.
+
+Native Godot headless UAT: **19 passed, 0 failed** (`tools/uat_operations.gd`).
+
+- [ ] Rendered desktop UAT: blocked by sandbox denial of the X11 socket; Wayland unavailable.
+- [ ] Human gameplay acceptance: Remote Mobile UAT ready to be conducted by user on phone via `http://192.168.20.10:8080/`.
+
+Known limits: school overcrowding remains after report publication (mitigated via IT administrative review order), spare delivery routes for non-bearing parts are absent, save codec is limited to this session bootstrap. See `PLAYABLE_OPERATIONS_LOOP.md` for detail.
+
+Next logical task: Launch `./tools/run_game_server.sh` and perform human mobile acceptance on phone/tablet over WiFi.
 
 ---
 

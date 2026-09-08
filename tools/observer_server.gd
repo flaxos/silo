@@ -34,6 +34,11 @@ const GeneticsReader = preload("res://src/presentation/genetics_reader.gd")
 const EpidemicSystem = preload("res://src/sim/health/epidemic_system.gd")
 const EpidemicInvariants = preload("res://src/sim/health/epidemic_invariants.gd")
 const HealthReader = preload("res://src/presentation/health_reader.gd")
+const OperationsSystem = preload("res://src/sim/operations/operations_system.gd")
+const OperationsSession = preload("res://src/sim/operations/operations_session.gd")
+const OperationsConfig = preload("res://src/sim/operations/operations_config.gd")
+const CaseReader = preload("res://src/presentation/case_reader.gd")
+const CommandAdapter = preload("res://src/presentation/command_adapter.gd")
 
 var server: TCPServer
 var port: int = DEFAULT_PORT
@@ -56,8 +61,11 @@ var prod_sys: ProductionSystem
 var maint_sys: MaintenanceSystem
 var water_sys: WaterSystem
 var inc_sys: IncidentSystem
+var ops_sys: OperationsSystem
 
 # Runtime controls
+var auto_pause_on_case: bool = true
+var operations_seen_next_id: int = 0
 var is_running: bool = false
 var ticks_per_step: int = 1
 var step_interval_sec: float = 0.5
@@ -134,45 +142,39 @@ func _init_simulation(pop_size: int, seed_val: int) -> void:
 	population_size = pop_size
 	sim_seed = seed_val
 	
-	engine = SimulationEngine.new(sim_seed)
+	engine = OperationsSession.create(population_size, sim_seed)
 	ws = engine.get_world_state()
 	
-	PopulationGenerator.generate_population(ws, population_size)
-	OccupationAssignment.setup_workplaces_and_assignments(ws)
-	
-	inst_sys = InstitutionSystem.new()
 	pol_sys = PoliticalSystem.new()
 	fact_sys = FactionSystem.new()
 	corr_sys = CorruptionSystem.new()
-	info_sys = InformationSystem.new()
 	action_sys = CollectiveActionSystem.new()
 	crime_sys = CrimeSystem.new()
 	sec_sys = SecuritySystem.new()
 	psych_sys = PsychologySystem.new()
 	rel_sys = RelationshipSystem.new()
 	epi_sys = EpidemicSystem.new()
-	daily_life = DailyLifeSystem.new()
-	prod_sys = ProductionSystem.new()
-	maint_sys = MaintenanceSystem.new()
-	water_sys = WaterSystem.new(50000.0, 100000.0)
-	inc_sys = IncidentSystem.new()
 	
-	engine.register_system(inst_sys)
 	engine.register_system(pol_sys)
 	engine.register_system(fact_sys)
 	engine.register_system(corr_sys)
-	engine.register_system(info_sys)
 	engine.register_system(action_sys)
 	engine.register_system(crime_sys)
 	engine.register_system(sec_sys)
 	engine.register_system(psych_sys)
 	engine.register_system(rel_sys)
 	engine.register_system(epi_sys)
-	engine.register_system(daily_life)
-	engine.register_system(maint_sys)
-	engine.register_system(prod_sys)
-	engine.register_system(water_sys)
-	engine.register_system(inc_sys)
+	
+	inst_sys = ws.custom_data.get("institution_system")
+	info_sys = ws.custom_data.get("information_system")
+	daily_life = ws.custom_data.get("daily_life_system")
+	maint_sys = ws.custom_data.get("maintenance_system")
+	prod_sys = ws.custom_data.get("production_system")
+	water_sys = ws.custom_data.get("water_system")
+	inc_sys = ws.custom_data.get("incident_system")
+	ops_sys = ws.custom_data.get("operations_system")
+	if ops_sys:
+		operations_seen_next_id = ops_sys.next_id
 
 func _process(delta: float) -> bool:
 	if not server:
@@ -184,6 +186,11 @@ func _process(delta: float) -> bool:
 		if time_since_last_step >= step_interval_sec:
 			time_since_last_step = 0.0
 			engine.step(ticks_per_step)
+			if auto_pause_on_case and ws.custom_data.has("operations_system"):
+				var ops := ws.custom_data.get("operations_system") as OperationsSystem
+				if ops and ops.next_id > operations_seen_next_id:
+					is_running = false
+					operations_seen_next_id = ops.next_id
 			
 	# Accept incoming TCP connections
 	while server.is_connection_available():
@@ -306,6 +313,58 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 	var status_code: int = 200
 	
 	match [method, api_path]:
+		["GET", "/api/operations/brief"]:
+			response_data = CaseReader.brief(ws)
+
+		["GET", "/api/operations/detail"]:
+			var cid: String = str(query_params.get("id", ""))
+			if cid.is_empty():
+				var brief: Dictionary = CaseReader.brief(ws)
+				if brief.active.size() > 0:
+					cid = str(brief.active[0].id)
+			if cid.is_empty():
+				response_data = {}
+			else:
+				response_data = CaseReader.detail(ws, cid)
+
+		["POST", "/api/operations/action"]:
+			var case_id: String = ""
+			var action_id: String = ""
+			if body is Dictionary:
+				case_id = str(body.get("case_id", ""))
+				action_id = str(body.get("action", body.get("action_id", "")))
+			elif query_params.has("case_id") and query_params.has("action"):
+				case_id = str(query_params["case_id"])
+				action_id = str(query_params["action"])
+				
+			if case_id.is_empty() or action_id.is_empty():
+				status_code = 400
+				response_data = {"success": false, "error": "Missing case_id or action"}
+			else:
+				var res: Dictionary = CommandAdapter.dispatch_case_action(ws, case_id, action_id)
+				res["success"] = res.get("ok", false)
+				response_data = res
+
+		["POST", "/api/operations/save"]:
+			var save_path := "/tmp/silo-session.save"
+			if body is Dictionary and body.has("path"):
+				save_path = str(body["path"])
+			var err: Error = OperationsSession.save_file(engine, save_path)
+			response_data = {"success": err == OK, "path": save_path, "error": error_string(err) if err != OK else ""}
+
+		["POST", "/api/operations/load"]:
+			var load_path := "/tmp/silo-session.save"
+			if body is Dictionary and body.has("path"):
+				load_path = str(body["path"])
+			var restored := OperationsSession.load_file(load_path)
+			if not restored:
+				status_code = 400
+				response_data = {"success": false, "error": "Failed to load session"}
+			else:
+				engine = restored
+				ws = engine.get_world_state()
+				response_data = {"success": true, "path": load_path, "current_tick": ws.sim_clock.get_tick()}
+
 		["GET", "/api/overview"]:
 			var snapshot: Dictionary = SimulationReader.get_full_telemetry_snapshot(ws)
 			snapshot["engine"] = {
@@ -315,6 +374,7 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"population_size": population_size,
 				"seed": sim_seed
 			}
+			snapshot["operations"] = CaseReader.brief(ws)
 			response_data = snapshot
 
 		["GET", "/api/spatial"], ["GET", "/api/physical_snapshot"]:
@@ -653,7 +713,8 @@ func _handle_api_request(peer: StreamPeerTCP, method: String, full_path: String,
 				"current_tick": ws.sim_clock.get_tick(),
 				"formatted_time": ws.sim_clock.get_formatted_time(),
 				"checksum": ws.get_state_checksum(),
-				"benchmark": last_benchmark_result
+				"benchmark": last_benchmark_result,
+				"operations_brief": CaseReader.brief(ws)
 			}
 			
 		["POST", "/api/pause"]:

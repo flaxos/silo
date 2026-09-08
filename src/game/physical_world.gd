@@ -72,6 +72,11 @@ var room_iso_rect_cache: Dictionary = {}
 var initial_view_mode: Variant = null
 var initial_label_mode: Variant = null
 
+var operations_panel: OperationsPanel
+var sidebar_tabs: TabContainer
+var operations_seen_next_id := 1
+var session_path := "user://operations_session.silo"
+
 var panel: PanelContainer
 var details_label: RichTextLabel
 var telemetry_label: RichTextLabel
@@ -127,6 +132,7 @@ func _ready() -> void:
 			camera.position = Vector2(center_pt.x + (192.0 / custom_zoom), center_pt.y)
 	elif initial_select_room == 0 and initial_select_person == 0:
 		call_deferred("_fit_whole")
+	sidebar_tabs.current_tab = 0
 	set_process(true)
 	queue_redraw()
 
@@ -196,16 +202,8 @@ func _parse_args() -> void:
 		else: i += 1
 
 func _boot_simulation() -> void:
-	engine = SimulationEngine.new(sim_seed)
+	engine = OperationsSession.create(population_size, sim_seed)
 	ws = engine.get_world_state()
-	PopulationGenerator.generate_population(ws, population_size)
-	OccupationAssignment.setup_workplaces_and_assignments(ws)
-	engine.register_system(InstitutionSystem.new())
-	engine.register_system(DailyLifeSystem.new())
-	engine.register_system(MaintenanceSystem.new())
-	engine.register_system(ProductionSystem.new())
-	engine.register_system(WaterSystem.new(50000.0, 100000.0))
-	engine.register_system(IncidentSystem.new())
 	snapshot = Reader.get_snapshot(ws, 1)
 	snapshot["incidents"] = Reader.get_incident_locations(ws)
 	geometry = snapshot.get("geometry", {})
@@ -239,9 +237,10 @@ func _build_ui() -> void:
 	top.offset_bottom = 54; top.add_theme_stylebox_override("panel", _tactical_panel_style(UI_TOP_BG, UI_BORDER))
 	layer.add_child(top)
 	var bar := HBoxContainer.new(); bar.add_theme_constant_override("separation", 8); top.add_child(bar)
-	var title := Label.new(); title.text = " ❖ SILO // TACTICAL OBSERVABILITY SYSTEM "
+	var title := Label.new(); title.text = "SILO"
 	title.add_theme_color_override("font_color", UI_BORDER_BRIGHT); bar.add_child(title)
 	status_label = Label.new(); status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_label.clip_text = true; status_label.custom_minimum_size.x = 180
 	status_label.add_theme_color_override("font_color", UI_LABEL); bar.add_child(status_label)
 
 	pause_button = Button.new(); pause_button.text = "⏸ PAUSE"; pause_button.focus_mode = Control.FOCUS_NONE
@@ -276,12 +275,27 @@ func _build_ui() -> void:
 	panel = PanelContainer.new(); panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
 	panel.offset_left = -385; panel.offset_top = 60; panel.offset_right = -10; panel.offset_bottom = -10
 	panel.add_theme_stylebox_override("panel", _tactical_panel_style(UI_PANEL_BG, UI_BORDER_BRIGHT))
+	var console_theme := Theme.new()
+	var console_font := SystemFont.new()
+	console_font.font_names = PackedStringArray(["DejaVu Sans", "Arial"])
+	console_theme.default_font = console_font
+	console_theme.default_font_size = 14
+	panel.theme = console_theme
+	top.theme = console_theme
 	layer.add_child(panel)
 
-	var side := VBoxContainer.new(); side.add_theme_constant_override("separation", 6); panel.add_child(side)
+	sidebar_tabs = TabContainer.new(); sidebar_tabs.use_hidden_tabs_for_min_size = false; panel.add_child(sidebar_tabs)
+	operations_panel = OperationsPanel.new(); sidebar_tabs.add_child(operations_panel)
+	operations_panel.case_selected.connect(_open_operation)
+	operations_panel.entity_requested.connect(_locate_operation_entity)
+	operations_panel.action_requested.connect(_operation_action)
+	operations_panel.archive_toggle.toggled.connect(func(_value: bool): _refresh_operations(false))
+	operations_panel.save_requested.connect(_save_operations)
+	operations_panel.load_requested.connect(_load_operations)
+	var side := VBoxContainer.new(); side.name = "Inspect"; side.add_theme_constant_override("separation", 6); sidebar_tabs.add_child(side)
 
 	var hud_title := Label.new(); hud_title.text = "┌── SILO TELEMETRY & OBSERVABILITY ──┐"
-	hud_title.add_theme_color_override("font_color", UI_HEADER); side.add_child(hud_title)
+	hud_title.clip_text = true; hud_title.add_theme_color_override("font_color", UI_HEADER); side.add_child(hud_title)
 
 	telemetry_label = RichTextLabel.new(); telemetry_label.bbcode_enabled = true; telemetry_label.fit_content = true
 	telemetry_label.custom_minimum_size.y = 115
@@ -290,7 +304,7 @@ func _build_ui() -> void:
 	var sep1 := HSeparator.new(); sep1.add_theme_stylebox_override("separator", _separator_style()); side.add_child(sep1)
 
 	var search_title := Label.new(); search_title.text = "ENTITY FINDER (RESIDENT / ROOM / MACHINE)"
-	search_title.add_theme_color_override("font_color", UI_ACCENT); side.add_child(search_title)
+	search_title.clip_text = true; search_title.add_theme_color_override("font_color", UI_ACCENT); side.add_child(search_title)
 
 	search_edit = LineEdit.new(); search_edit.placeholder_text = "Search ID, Name, or Room Type…"
 	search_edit.text_changed.connect(_search); search_edit.text_submitted.connect(func(_q: String): _activate_first_search())
@@ -313,11 +327,12 @@ func _build_ui() -> void:
 	follow_button.pressed.connect(_toggle_follow); _style_tactical_button(follow_button); side.add_child(follow_button)
 
 	var help := Label.new(); help.text = "W/A/S/D / RMB: Pan   Wheel: Zoom   F: Fit   Space: Pause\nV: View (Cutaway/Iso/Plan)   L: Labels (Full/Icons/Off)   I: Isolate   G: Track"
-	help.add_theme_color_override("font_color", UI_MUTED); side.add_child(help)
+	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; help.add_theme_color_override("font_color", UI_MUTED); side.add_child(help)
 
 	_update_status()
 	_update_telemetry()
 	_update_speed_buttons()
+	_refresh_operations(false)
 
 func _tactical_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -492,6 +507,7 @@ func _refresh_live() -> void:
 	_update_status()
 	_update_telemetry()
 	if not selected_type.is_empty(): _show_details(selected_type, selected_id)
+	_refresh_operations(true)
 
 func _toggle_pause() -> void:
 	_set_speed(0.0 if speed > 0.0 else 1.0)
@@ -532,10 +548,9 @@ func _update_status() -> void:
 		hour = int(clock.get("hour", 0))
 		minute = int(clock.get("minute", 0))
 		tick_num = int(clock.get("tick", snapshot.get("revision", 0)))
-	var state_text := "[⏸ PAUSED]" if speed == 0.0 else "[▶ RUNNING %.1f×]" % speed
-	status_label.text = "Year %d · Day %d · %02d:%02d  |  %s  |  %d RESIDENTS (RED DOTS)  |  TICK %d" % [
-		year, day, hour, minute, state_text, people_by_id.size(), tick_num
-	]
+	var state_text := "PAUSED" if speed == 0.0 else "%.1f×" % speed
+	status_label.text = "Y%d D%d %02d:%02d · %s" % [year, day, hour, minute, state_text]
+	status_label.tooltip_text = "Year %d · Day %d · %02d:%02d | %d residents | Tick %d" % [year, day, hour, minute, people_by_id.size(), tick_num]
 
 func _cycle_view_mode() -> void:
 	_set_view_mode((view_mode + 1) % 3)
@@ -1574,6 +1589,7 @@ func _pick(point: Vector2) -> void:
 			if Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point) < 18: _select_stair(seg); return
 
 func _select(type: String, id: String, room_id: int) -> void:
+	if sidebar_tabs: sidebar_tabs.current_tab = 1
 	selected_type = type; selected_id = id; selected_room_id = room_id
 	follow_button.disabled = type != "person"; _show_details(type, id); queue_redraw()
 
@@ -1972,3 +1988,62 @@ func _room_label(room: Dictionary) -> String:
 		var summary: Dictionary = room_summary_by_id[id]
 		return str(summary.get("room_type_name", summary.get("name", "Room"))).to_upper()
 	return "ROOM"
+
+# Operations wiring only; evidence, commands and detail layout live in bounded components.
+func _refresh_operations(allow_pause: bool) -> void:
+	if not operations_panel: return
+	var ops := ws.custom_data.get("operations_system") as OperationsSystem
+	if allow_pause and ops.next_id > operations_seen_next_id and operations_panel.auto_pause.button_pressed:
+		_set_speed(0.0)
+		operations_panel.feedback.text = "New case detected. Open it to investigate; Space resumes time."
+		sidebar_tabs.current_tab = 0
+	operations_seen_next_id = ops.next_id
+	operations_panel.refresh(CaseReader.brief(ws), CaseReader.detail(ws, operations_panel.selected_case))
+
+func _open_operation(case_id: String) -> void:
+	operations_panel.selected_case = case_id
+	var detail := CaseReader.detail(ws, case_id)
+	if detail.has("focus"):
+		_locate_operation_entity(detail.focus)
+		sidebar_tabs.current_tab = 0
+	_refresh_operations(false)
+
+func _locate_operation_entity(ref: Dictionary) -> void:
+	var kind := str(ref.get("type", ""))
+	var id := int(ref.get("id", 0))
+	var rid := int(ref.get("room_id", 0))
+	# Inventory inspection is already embedded in its authoritative owner room.
+	if kind == "inventory": kind = "room"; id = rid
+	if id <= 0 or not room_by_id.has(rid):
+		operations_panel.feedback.text = "No supported physical location for this reference."
+		operations_panel.feedback.visible = true
+		return
+	_select(kind, str(id), rid)
+	_focus_room(rid, 1.1)
+
+func _operation_action(case_id: String, action: String) -> void:
+	var result := CommandAdapter.dispatch_case_action(ws, case_id, action)
+	operations_panel.feedback.text = str(result.message)
+	_refresh_operations(false)
+
+func _save_operations() -> void:
+	var error := OperationsSession.save_file(engine, session_path)
+	operations_panel.feedback.text = "Session saved: " + session_path if error == OK else "Save failed: " + error_string(error)
+	_refresh_operations(false)
+
+func _load_operations() -> void:
+	var restored := OperationsSession.load_file(session_path)
+	if not restored:
+		operations_panel.feedback.text = "No valid operations session at " + session_path
+		operations_panel.feedback.visible = true
+		return
+	engine = restored; ws = engine.get_world_state()
+	sim_seed = ws.initial_seed; population_size = ws.entity_registry.get_entities_by_type("person").size()
+	snapshot = Reader.get_snapshot(ws, 1); geometry = snapshot.get("geometry", {})
+	_build_indexes()
+	person_draw_positions.clear(); person_visual_positions.clear(); room_iso_rect_cache.clear()
+	selected_type = ""; selected_id = ""; selected_room_id = 0; follow_person_id = 0; isolated_level = null
+	operations_panel.selected_case = ""; tick_accumulator = 0.0
+	_set_speed(0.0); _refresh_live(); _fit_whole()
+	operations_panel.feedback.text = "Session restored and paused. Space resumes."
+	_refresh_operations(false)

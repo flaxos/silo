@@ -303,6 +303,23 @@ func propagate_word_of_mouth(
 
 # --- Institutional Actions ---
 
+## Release an existing report, removing its pending timer to prevent double delivery.
+## This is a domain API; gameplay classification/role checks live in OperationsCommands.
+func release_information(ws: WorldState, info_id: int) -> bool:
+	var info := _find_information(ws, info_id)
+	if not info or info.reach_count > 0:
+		return false
+	var pending: Array = ws.custom_data.get("pending_delayed_information", [])
+	pending.erase(info)
+	ws.custom_data["pending_delayed_information"] = pending
+	info.censorship_state = InformationObject.STATE_ACTIVE
+	info.delay_ticks_remaining = 0
+	var audit: Array = ws.custom_data.get("censorship_audit_log", [])
+	audit.append({"action": "release", "info_id": info_id, "tick": ws.sim_clock.get_tick()})
+	ws.custom_data["censorship_audit_log"] = audit
+	disseminate(ws, info)
+	return true
+
 ## Suppresses an information object. Halts official dissemination without deleting underlying truth.
 func suppress_information(ws: WorldState, info_id: int, reason: String = "") -> bool:
 	var info: InformationObject = _find_information(ws, info_id)

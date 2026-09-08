@@ -781,3 +781,74 @@ Disease transmission must emerge from actual physical and social contact structu
 
 
 
+
+
+---
+
+## ADR-028: Bounded IT operations workflow and playable session
+
+### Status
+Accepted for integration V0.1, 2026-09-08. Advanced roadmap unchanged; rendered/human acceptance remains pending.
+
+### Context
+The Godot world exposed simulation telemetry but had no recurring player workflow. Existing observer commands had broad administrative power, while the player role is Head of IT. Generic engine loading restored entity dictionaries rather than typed running entities. The integration must provide meaningful actions without adding a new physical or political domain.
+
+### Decision
+Introduce two workflow templates: pump maintenance risk and institutional information review. A post-domain operations system tracks real source conditions, references authoritative incidents, and records player decisions and observed consequences. A case does not itself repair a machine or resolve an incident.
+
+Grant a narrow standing Engineering scheduling delegation in the playable-session bootstrap: IT may reserve one targeted early-service window for 144 ticks at 55% component wear. It lowers eligibility for that machine only. Existing scheduled technicians, replacement stocks and repair labour remain mandatory. Cancellation/expiry restores the normal threshold. Parts and labour consumed earlier, plus the single reserved slot, are the opportunity cost. No conscription, quotas, machine overdrive or magic repair is exposed.
+
+Reuse the existing InformationSystem for public/internal official reports. A small bridge records actual school attendance exceeding declared capacity, with stable source room and observation time. Already exposed audit records can also be bridged; concealed actions are not revealed and corruption generation is not newly activated. Publication, bounded review delay, withholding and monitoring affect existing dissemination/belief processing. Delivery completes the communication workflow, not the reported facility problem.
+
+Queue commands through the existing EventQueue and validate authority and target both when queued and executed. Keep the permissive legacy observer adapter methods as developer tooling. Pure evidence/readers expose only supported causal links, known records and truthful unknowns; no backend uncertainty is fabricated.
+
+Use separate operations and detail UI components. Preserve renderer geometry and all generated room, bed, person, household, workplace and schedule mappings. Initialize the playable pump with physically consistent inherited component age (54.8% bearing wear), without changing degradation rates or injecting future failures.
+
+Provide a version-1 binary session codec limited to this bootstrap, preserving int64 RNG state, integer dictionary keys, typed entities, system state, commands and spatial journeys. Do not redesign generic persistence for every advanced domain during this integration.
+
+### Consequences
+The player can detect, locate, investigate, request/monitor, advance time, and observe real repair or information-delivery outcomes. Tests prove counterfactual differences, conservation, authority, replay and save continuation. The 1,200-resident scene retains coarse labour arithmetic and documented staffing imbalances. Desktop visual/human acceptance must be reported independently of passing headless control automation.
+
+---
+
+## ADR-029: Operations Narrative Presentation Layer, Anti-Magic Disclosures & Labour Crew Capping
+
+### Status
+Accepted (Operations UX Clarity Pass, 2026-09-08).
+
+### Context
+Following verification of the Playable Operations Loop V0.1 baseline:
+1. Operations UI text sounded like engine debug output and raw enums rather than an authentic operational briefing.
+2. Human players need plain-English clarity regarding: what is happening, why, why it matters, who/what is affected, knowns vs. unknowns, IT authority boundaries, and what actions will and will NOT solve.
+3. Information actions (e.g., publishing overcrowding reports) could be misinterpreted by players as physical solutions to facility shortages.
+4. Maintenance labour arithmetic allowed up to 45 technicians working simultaneously to finish complex repairs in a single tick.
+5. The staffing audit identified 1 critical missing role (`security_officer` at Level 7 Security Post) and 8 questionable demographic/occupational distributions.
+
+### Decision
+1. **Human Narrative Formatting Layer (`src/presentation/case_formatter.gd`)**:
+   - Pure presentation translation layer that converts raw machine telemetry and information states into structured operational briefings answering 7 core human questions.
+   - Forbids engine debug jargon, raw enum strings, and abstract modifiers in user-facing text.
+   - Explicitly partitions root physical problems (facility deficits) from official information status (censored vs. delivered).
+   - Clarifies IT authority boundaries (communications, scheduling requests, data analysis) versus outside authority (Engineering maintenance budgets, Board capital construction, education staffing).
+2. **Anti-Magic Action Disclaimers & Trade-Offs**:
+   - Every available action specifies: Why do it, Trade-off, and What it does NOT do.
+   - For information cases: publishing discloses that it does *not* build classrooms or hire teachers.
+   - Added an administrative escalation action (`request_review` issuing `it_school_capacity_review` executive order) allowing IT to formally request facility expansion review without faking municipal construction.
+   - For pump maintenance: early service discloses that it does *not* instantly repair the machine or fabricate spare parts.
+3. **Bounded Workspace Crew Cap (`src/sim/machinery/maintenance_system.gd`)**:
+   - Added `MAX_CREW_PER_MACHINE = 3` constant.
+   - Bounded effective repair labour per tick at `mini(tech_count, MAX_CREW_PER_MACHINE)`.
+   - Eliminates single-tick instant repair anomalies while preserving multi-tick repair progression and physical labour conservation.
+4. **Staffing Audit Resolution**:
+   - Defined `DEPT_SECURITY: String = "security"` and `"security_officer"` in `src/sim/population/occupation.gd`.
+   - Added `"security_officer"` to adult job generator in `src/sim/population/occupation_assignment.gd`.
+   - 27 security officers deterministically generated and assigned to Level 7 Security Post (#2010), matching existing room capacity and leaving 0 unassigned errors.
+5. **Godot UI Viewport Containment**:
+   - Optimized `OperationsPanel` and `CaseDetailPanel` vertical sizing, separations, and minimum heights.
+   - Entire operations sidebar and decision buttons fit comfortably within standard 1440×900 display viewports (panel height bounded at 830px).
+
+### Consequences
+- Human players receive clear, truthful, non-magical briefings of all operational cases.
+- Simulation invariants, mass conservation, and physical dependency chains remain strictly authoritative and unaltered.
+- 100% test passing (1,313 assertions, 33 test suites) and 100% headless UAT passing (19/19 checks, 0 failures).
+- Desktop visual / human gameplay acceptance is explicitly tracked as PENDING on a real display.

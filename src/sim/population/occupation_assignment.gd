@@ -21,7 +21,8 @@ static func setup_workplaces_and_assignments(world_state: WorldState) -> Diction
 		"doctor", "nurse", "nurse",
 		"teacher", "teacher",
 		"cook", "cook",
-		"sanitation_worker"
+		"sanitation_worker",
+		"security_officer"
 	]
 	
 	var stats: Dictionary = {

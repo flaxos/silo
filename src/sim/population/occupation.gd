@@ -21,6 +21,7 @@ const DEPT_EDUCATION: String = "education_school"
 const DEPT_LOGISTICS: String = "logistics_stores"
 const DEPT_IT: String = "executive_it"
 const DEPT_SANITATION: String = "sanitation"
+const DEPT_SECURITY: String = "security"
 
 const OCCUPATION_DEFINITIONS: Dictionary = {
 	"miner": {
@@ -99,6 +100,12 @@ const OCCUPATION_DEFINITIONS: Dictionary = {
 		"title": "Sanitation Worker",
 		"department": DEPT_SANITATION,
 		"room_type": Room.TYPE_HYGIENE_FACILITY,
+		"shifts": [SHIFT_DAY, SHIFT_NIGHT]
+	},
+	"security_officer": {
+		"title": "Security Officer",
+		"department": DEPT_SECURITY,
+		"room_type": Room.TYPE_SECURITY_POST,
 		"shifts": [SHIFT_DAY, SHIFT_NIGHT]
 	},
 	"student": {

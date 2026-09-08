@@ -121,3 +121,16 @@ The central container holding the authoritative state of the universe:
 The simulation already owns levels, sectors, rooms, beds, home and workplace references, and abstract timed travel. `SiloSpatialModel` adds a deterministic geometric interpretation of existing assignments; it neither advances RNG nor registers entities. `PhysicalReader` composes read-only map snapshots and selected entity details. Browser camera position, selection, visibility, and interpolation are presentation state only. No new routing, job, production, or utility simulation is introduced.
 
 Initial geometry/identities are separated from live updates. A server reset revision invalidates browser caches. Int64 checksums on the physical API are strings, preserving exact values across JSON and JavaScript. System dependency links describe existing production and utility relationships; circulation geometry does not establish lift/pathfinding simulation.
+
+
+## Playable Operations V0.1 integration
+
+The Godot game now boots `OperationsSession`: Institutions (30), Information (38), DailyLife (50), Maintenance (55), Production (60), Water (65), Incidents (80), Operations (85). Existing advanced systems are not implicitly activated.
+
+`WorldState → OperationsEvidence / OperationsReports → OperationsSystem → CaseReader → OperationsPanel / CaseDetailPanel`.
+
+Gameplay commands flow back through `CommandAdapter.dispatch_case_action → OperationsCommands.queue → EventQueue → OperationsSystem.handle_event → allowlisted domain API`. They are revalidated before execution at the next tick. IT's standing Engineering delegation permits only a single targeted, one-day early-service order; normal maintenance still requires its existing physical prerequisites. Information review dispatches existing publication/delay/suppression APIs.
+
+Case state is simulation-owned workflow, separate from authoritative incidents. Read models return deep copies. Renderer selection, camera and UI controls do not mutate case or domain state directly. The legacy unrestricted observer command methods remain developer tools.
+
+`OperationsSession.capture/restore` supplies a versioned, value-only binary codec for this specific gameplay bootstrap, including typed entity rehydration, system state, pending information references, queued inputs, RNG and existing spatial journeys. It does not change generic `SimulationEngine.save_to_dict/load_from_dict`, whose legacy domain rehydration remains incomplete. See `PLAYABLE_OPERATIONS_LOOP.md` and ADR-028.

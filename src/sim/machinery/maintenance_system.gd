@@ -6,6 +6,8 @@ const SYSTEM_ID: String = "machinery_maintenance"
 const EXECUTION_ORDER: int = 55
 const HOURS_PER_TICK: float = 10.0 / 60.0 # 1/6 hour per 10-minute tick
 const MAINTENANCE_TRIGGER_WEAR: float = 60.0
+const MAX_CREW_PER_MACHINE: int = 3 # Physical workspace limit per machine component
+
 
 var _cached_machines: Array[Machine] = []
 var _cached_persons: Array[Person] = []
@@ -43,9 +45,12 @@ func tick(world_state: Variant) -> void:
 				workers_by_room[rid] = workers_by_room.get(rid, 0) + 1
 				
 	# 3. Process maintenance and component repairs
-	var trigger_wear: float = float(ws.custom_data.get("maintenance_trigger_wear", MAINTENANCE_TRIGGER_WEAR))
 	for i in range(machine_count):
 		var machine: Machine = _cached_machines[i]
+		var trigger_wear: float = float(ws.custom_data.get("maintenance_trigger_wear", MAINTENANCE_TRIGGER_WEAR))
+		var institution := ws.custom_data.get("institution_system") as InstitutionSystem
+		if institution:
+			trigger_wear = institution.get_machine_maintenance_threshold(machine.id)
 		var tech_count: int = workers_by_room.get(machine.room_id, 0)
 		
 		if tech_count <= 0:
@@ -86,8 +91,9 @@ func tick(world_state: Variant) -> void:
 			# Cannot repair without required spare component in inventory
 			continue
 			
-		# Apply technician labor ticks
-		target_comp.accumulated_repair_ticks += tech_count
+		# Apply technician labor ticks (capped by physical workspace on component)
+		var effective_crew: int = mini(tech_count, MAX_CREW_PER_MACHINE)
+		target_comp.accumulated_repair_ticks += effective_crew
 		
 		if target_comp.accumulated_repair_ticks >= target_comp.repair_ticks_required:
 			# Consume spare part from inventory

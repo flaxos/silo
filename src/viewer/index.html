@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>PROJECT SILO — Authoritative Simulation Observability Dashboard</title>
   <link rel="stylesheet" href="viewer.css">
   <link rel="stylesheet" href="physical.css">
+  <link rel="stylesheet" href="operations.css">
 </head>
 <body>
   <div id="app">
@@ -58,9 +59,14 @@
     <div id="workspace">
       <!-- Navigation Sidebar -->
       <nav id="nav-sidebar">
+        <div class="nav-section-title">ACTIVE GAMEPLAY</div>
+        <ul class="nav-menu">
+          <li><a href="#operations" class="nav-link active" data-tab="tab-operations"><span class="icon">⚡</span> Operations Console <span id="nav-ops-badge" class="badge">0</span></a></li>
+        </ul>
+
         <div class="nav-section-title">CORE OBSERVABILITY</div>
         <ul class="nav-menu">
-          <li><a href="#physical" class="nav-link active" data-tab="tab-physical"><span class="icon">◈</span> Live Physical Silo</a></li>
+          <li><a href="#physical" class="nav-link" data-tab="tab-physical"><span class="icon">◈</span> Live Physical Silo</a></li>
           <li><a href="#overview" class="nav-link" data-tab="tab-overview"><span class="icon">📊</span> Overview & Telemetry</a></li>
           <li><a href="#people" class="nav-link" data-tab="tab-people"><span class="icon">👥</span> Population (<span id="nav-pop-count">0</span>)</a></li>
           <li><a href="#households" class="nav-link" data-tab="tab-households"><span class="icon">🏡</span> Households</a></li>
@@ -99,7 +105,152 @@
       <!-- Main Content Area with Tab Panels -->
       <main id="tab-content-area">
 
-        <section id="tab-physical" class="tab-panel active physical-tab" aria-label="Live physical silo viewer">
+        <!-- TAB 0: PLAYABLE OPERATIONS CONSOLE (HEAD OF IT) -->
+        <section id="tab-operations" class="tab-panel active operations-tab" aria-label="Playable operations console">
+          <div class="ops-shell">
+            <!-- Mobile Sticky Controls Bar -->
+            <div class="ops-mobile-bar">
+              <div class="ops-mobile-status">
+                <span class="ops-kicker">OPERATIONS · HEAD OF IT</span>
+                <strong id="ops-top-summary">Connecting to simulation…</strong>
+              </div>
+              <div class="ops-mobile-actions">
+                <button class="btn btn-sm btn-primary" id="ops-btn-play">▶ Play</button>
+                <button class="btn btn-sm btn-step" id="ops-btn-step">+1 Tick</button>
+                <button class="btn btn-sm btn-step" id="ops-btn-step-hour">+1 Hr</button>
+                <select id="ops-select-speed" class="ops-speed-picker">
+                  <option value="1">1×</option>
+                  <option value="4">4×</option>
+                  <option value="16">16×</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Operations Main Container (Grid on desktop, stacked on mobile) -->
+            <div class="ops-layout">
+              <!-- Left Column: Case Queue -->
+              <div class="ops-sidebar">
+                <div class="ops-sidebar-header">
+                  <div class="ops-header-title">
+                    <span class="ops-badge-open" id="ops-open-count">0 OPEN</span>
+                    <span>INCIDENT QUEUE</span>
+                  </div>
+                  <div class="ops-filter-pills">
+                    <button class="ops-pill-btn active" id="ops-btn-active">Active</button>
+                    <button class="ops-pill-btn" id="ops-btn-archive">Outcomes</button>
+                    <label class="ops-autopause-toggle" title="Auto-pause simulation when a new case occurs">
+                      <input type="checkbox" id="ops-autopause" checked> Auto-pause
+                    </label>
+                  </div>
+                </div>
+                <div id="ops-case-list" class="ops-case-list" role="listbox">
+                  <div class="ops-empty-state">No open incidents. Time advances smoothly.</div>
+                </div>
+              </div>
+
+              <!-- Right Column: Case Investigation & Directive Console -->
+              <div class="ops-detail-panel" id="ops-detail-container">
+                <div id="ops-detail-empty" class="ops-empty-detail">
+                  <div class="ops-empty-icon">⚡</div>
+                  <h3>SELECT AN OPERATIONAL CASE</h3>
+                  <p>Choose an active incident from the queue to review vital telemetry, diagnose the root problem, and dispatch IT directives.</p>
+                </div>
+
+                <div id="ops-detail-content" class="ops-detail-content hidden">
+                  <!-- Case Header -->
+                  <div class="ops-case-header">
+                    <div class="ops-case-meta">
+                      <span class="ops-case-severity" id="ops-case-severity">CRITICAL</span>
+                      <span class="ops-case-age" id="ops-case-age">Age: 0h 00m</span>
+                      <span class="ops-case-status" id="ops-case-status">Status: Action active</span>
+                    </div>
+                    <h2 class="ops-case-title" id="ops-case-title">WATER PUMP FAILURE</h2>
+                    <div class="ops-location-row">
+                      <span class="ops-location-text" id="ops-case-location">Level 18 · Room #2006</span>
+                      <button class="btn btn-locate" id="ops-btn-locate">🔍 LOCATE IN SILO MAP</button>
+                    </div>
+                  </div>
+
+                  <!-- 1. OS Vital Signs & Telemetry Box -->
+                  <div class="ops-vitals-box">
+                    <div class="ops-box-header">┌── OS VITAL SIGNS & TELEMETRY ──┐</div>
+                    <div class="ops-gauges" id="ops-gauges"></div>
+                    <div class="ops-chips" id="ops-chips"></div>
+                    <div class="ops-situation-box">
+                      <div class="ops-sit-line"><strong>Status:</strong> <span id="ops-situation-text">—</span></div>
+                      <div class="ops-stk-line"><strong>Stakes:</strong> <span id="ops-stakes-text">—</span></div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Dedicated Directive / Decision Terminal Console -->
+                  <div class="ops-directive-box">
+                    <div class="ops-directive-header">┌── DIRECTIVE CONSOLE: SELECTION & DISPATCH ──┐</div>
+                    
+                    <div class="ops-choice-picker">
+                      <label for="ops-action-select" class="ops-label">SELECT AUTHORIZED DIRECTIVE:</label>
+                      <select id="ops-action-select" class="ops-dropdown"></select>
+                    </div>
+
+                    <div class="ops-explainer-card" id="ops-explainer">
+                      <div class="ops-exp-row ops-exp-order">
+                        <span class="ops-exp-label">Directive Order:</span>
+                        <span id="ops-exp-desc">—</span>
+                      </div>
+                      <div class="ops-exp-row ops-exp-why">
+                        <span class="ops-exp-label">► Purpose:</span>
+                        <span id="ops-exp-why">—</span>
+                      </div>
+                      <div class="ops-exp-row ops-exp-tradeoff">
+                        <span class="ops-exp-label">▲ Trade-off:</span>
+                        <span id="ops-exp-tradeoff">—</span>
+                      </div>
+                      <div class="ops-exp-row ops-exp-boundary">
+                        <span class="ops-exp-label">⚠️ DOES NOT SOLVE:</span>
+                        <span id="ops-exp-boundary">—</span>
+                      </div>
+                      <div class="ops-exp-blocked hidden" id="ops-exp-blocked"></div>
+                    </div>
+
+                    <div class="ops-dispatch-row">
+                      <button class="btn btn-dispatch" id="ops-btn-dispatch">⚡ QUEUE DIRECTIVE → ADVANCE TIME</button>
+                    </div>
+                    <div class="ops-feedback-msg" id="ops-feedback"></div>
+                  </div>
+
+                  <!-- 3. OS Deep Dossier Tabs -->
+                  <div class="ops-dossier-box">
+                    <div class="ops-dossier-tabs">
+                      <button class="ops-dossier-tab active" data-dossier-tab="full">Full Dossier</button>
+                      <button class="ops-dossier-tab" data-dossier-tab="history">History & Logs</button>
+                      <button class="ops-dossier-tab" data-dossier-tab="tech">Telemetry / IDs</button>
+                    </div>
+                    <div class="ops-dossier-panels">
+                      <div class="ops-dossier-panel active" id="ops-tab-full">
+                        <div class="ops-prose" id="ops-dossier-text">Loading briefing…</div>
+                      </div>
+                      <div class="ops-dossier-panel" id="ops-tab-history">
+                        <div class="ops-prose" id="ops-history-text">No history recorded yet.</div>
+                      </div>
+                      <div class="ops-dossier-panel" id="ops-tab-tech">
+                        <div class="ops-prose" id="ops-tech-text">No technical telemetry.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Session footer -->
+                  <div class="ops-footer">
+                    <button class="btn btn-secondary btn-sm" id="ops-btn-save">💾 Save Session</button>
+                    <button class="btn btn-secondary btn-sm" id="ops-btn-load">📂 Load Session</button>
+                    <span class="ops-footer-note">Authoritative execution on host</span>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-physical" class="tab-panel physical-tab" aria-label="Live physical silo viewer">
           <div class="physical-shell">
             <aside class="physical-tools">
               <div class="physical-brand"><span class="pulse"></span><div><strong>LIVE CUTAWAY</strong><small>AUTHORITATIVE STATE</small></div></div>
@@ -835,9 +986,30 @@
       </div>
     </div>
 
+    <!-- Mobile Bottom Navigation Bar (Thumb Friendly) -->
+    <nav id="mobile-nav" class="mobile-only" aria-label="Mobile navigation">
+      <button class="mobile-nav-btn active" data-tab="tab-operations">
+        <span class="m-icon">⚡</span>
+        <span class="m-label">Operations</span>
+      </button>
+      <button class="mobile-nav-btn" data-tab="tab-physical">
+        <span class="m-icon">◈</span>
+        <span class="m-label">Silo Map</span>
+      </button>
+      <button class="mobile-nav-btn" data-tab="tab-overview">
+        <span class="m-icon">📊</span>
+        <span class="m-label">Telemetry</span>
+      </button>
+      <button class="mobile-nav-btn" data-tab="tab-people">
+        <span class="m-icon">👥</span>
+        <span class="m-label">Colony</span>
+      </button>
+    </nav>
+
   </div>
 
   <script src="viewer.js"></script>
   <script src="physical.js"></script>
+  <script src="operations.js"></script>
 </body>
 </html>
